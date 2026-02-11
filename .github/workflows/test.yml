@@ -1,0 +1,246 @@
+name: Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly full matrix test
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  # Core tests on strategic matrix
+  test-core:
+    name: Core Tests (Py${{ matrix.python-version }} - ${{ matrix.library }}-${{ matrix.library-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.10', '3.12']
+        library: ['matplotlib', 'seaborn', 'plotly', 'altair']
+        library-version: ['min', 'latest']
+        exclude:
+          # Exclude incompatible combinations
+          - python-version: '3.8'
+            library: 'altair'
+            library-version: 'latest'
+    
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install base dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -e .[dev,${{ matrix.library }}]
+      
+      - name: Install specific library version
+        if: matrix.library-version == 'min'
+        run: |
+          # Install minimum version based on pyproject.toml
+          case "${{ matrix.library }}" in
+            matplotlib)
+              pip install "matplotlib>=2.0.0,<3.0.0"
+              ;;
+            seaborn)
+              pip install "seaborn>=0.9.0,<0.11.0"
+              ;;
+            plotly)
+              pip install "plotly>=4.0.0,<5.0.0"
+              ;;
+            altair)
+              pip install "altair>=3.0.0,<4.0.0"
+              ;;
+          esac
+      
+      - name: Display installed versions
+        run: |
+          echo "Python version:"
+          python --version
+          echo ""
+          echo "Installed packages:"
+          pip list | grep -E "(matplotlib|seaborn|plotly|altair|pytest)" || true
+      
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=sane_figs --cov-report=xml --cov-report=term-missing
+      
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.10' && matrix.library == 'matplotlib' && matrix.library-version == 'latest'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  # Full matrix on latest Python (weekly)
+  test-full:
+    name: Full Matrix Tests (Py${{ matrix.python-version }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.11']
+        include:
+          - python-version: '3.9'
+            matplotlib: '3.5.0'
+            seaborn: '0.12.0'
+            plotly: '5.0.0'
+            altair: '5.0.0'
+          - python-version: '3.11'
+            matplotlib: '3.8.0'
+            seaborn: '0.13.0'
+            plotly: '5.18.0'
+            altair: '5.4.0'
+    
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -e .[dev,all]
+          pip install "matplotlib==${{ matrix.matplotlib }}"
+          pip install "seaborn==${{ matrix.seaborn }}"
+          pip install "plotly==${{ matrix.plotly }}"
+          pip install "altair==${{ matrix.altair }}"
+      
+      - name: Display installed versions
+        run: |
+          echo "Python version:"
+          python --version
+          echo ""
+          echo "Installed packages:"
+          pip list | grep -E "(matplotlib|seaborn|plotly|altair|pytest)" || true
+      
+      - name: Run tests
+        run: pytest tests/ -v --cov=sane_figs --cov-report=term-missing
+
+  # Visual regression tests
+  test-visual:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # For git history comparison
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -e .[dev,all]
+          pip install pytest-regressions>=2.5.0
+      
+      - name: Run visual tests
+        run: pytest tests/visual/ --regression -v
+      
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: tests/visual/__diffs__/
+          retention-days: 7
+
+  # Linting and type checking
+  lint:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -e .[dev]
+      
+      - name: Run black
+        run: black --check sane_figs tests
+      
+      - name: Run ruff
+        run: ruff check sane_figs tests
+      
+      - name: Run mypy
+        run: mypy sane_figs --ignore-missing-imports
+
+  # Test with all libraries on latest Python
+  test-all-libraries:
+    name: All Libraries (Py3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -e .[dev,all]
+      
+      - name: Run tests
+        run: pytest tests/ -v --cov=sane_figs --cov-report=xml --cov-report=term-missing
+
+  # Build and test package
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel build twine
+      
+      - name: Build package
+        run: python -m build
+      
+      - name: Check package
+        run: twine check dist/*
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7

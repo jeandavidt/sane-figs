@@ -1,0 +1,143 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sane-figs"
+version = "0.1.0"
+description = "Publication-ready figures for Matplotlib, Seaborn, Plotly, and Altair"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Jean-David T.", email = "jeandavid@example.com"}
+]
+maintainers = [
+    {name = "Jean-David T.", email = "jeandavid@example.com"}
+]
+keywords = [
+    "visualization",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "altair",
+    "publication",
+    "figures",
+    "plotting",
+    "scientific",
+    "research"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "importlib-metadata; python_version < '3.8'",
+    "Pillow>=9.0.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+matplotlib = ["matplotlib>=2.0.0"]
+seaborn = ["seaborn>=0.9.0", "matplotlib>=2.0.0"]
+plotly = [
+    "altair>=5.4.1",
+    "pandas>=2.0.3",
+    "plotly>=4.0.0",
+]
+altair = ["altair>=3.0.0"]
+all = [
+    "matplotlib>=2.0.0",
+    "seaborn>=0.9.0",
+    "plotly>=4.0.0",
+    "altair>=3.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-regressions>=2.5.0",
+    "pytest-xdist>=3.0.0",
+    "packaging>=23.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-regressions>=2.5.0",
+    "pytest-xdist>=3.0.0",
+    "packaging>=23.0.0",
+    "pandas>=1.0.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "pymdown-extensions>=10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jeandavidt/sane-figs"
+Documentation = "https://sane-figs.readthedocs.io"
+Repository = "https://github.com/jeandavidt/sane-figs"
+Issues = "https://github.com/jeandavidt/sane-figs/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sane_figs*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=sane_figs --cov-report=term-missing --strict-markers"
+markers = [
+    "visual: marks tests as visual regression tests",
+    "matplotlib_min: tests for matplotlib minimum version (2.0.x)",
+    "matplotlib_3_0: tests for matplotlib 3.0+",
+    "matplotlib_3_5: tests for matplotlib 3.5+",
+    "seaborn_0_11: tests for seaborn 0.11+",
+    "seaborn_0_12: tests for seaborn 0.12+",
+    "plotly_5_0: tests for plotly 5.0+",
+    "altair_5_0: tests for altair 5.0+",
+    "matplotlib: tests requiring matplotlib",
+    "seaborn: tests requiring seaborn",
+    "plotly: tests requiring plotly",
+    "altair: tests requiring altair",
+]
+
+[tool.uv.sources]
+sane-figs = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "marimo>=0.8.22",
+    "mkdocs>=1.6.1",
+    "plotly>=6.5.2",
+    "pymdown-extensions>=10.0",
+    "sane-figs",
+]

@@ -1,0 +1,30 @@
+site_name: Sane-Figs
+site_url: https://jeandavidt.github.io/sane-figs/
+repo_url: https://github.com/jeandavidt/sane-figs
+
+nav:
+  - Home: index.md
+  - Presets: presets.md
+  - Colorways: colorways.md
+  - Watermarks: watermarks.md
+  - Interactive Demo: interactive_demo.md
+  - Libraries:
+    - Matplotlib: libraries/matplotlib.md
+    - Seaborn: libraries/seaborn.md
+    - Plotly: libraries/plotly.md
+    - Altair: libraries/altair.md
+
+theme:
+  name: readthedocs
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - tables
+
+hooks:
+  - hooks/__init__.py

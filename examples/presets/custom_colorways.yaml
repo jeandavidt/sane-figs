@@ -1,0 +1,73 @@
+# Example file with custom colorways for sane-figs
+
+colorways:
+  # My lab's official color palette
+  - name: "my-lab-colors"
+    description: "My lab's official color palette"
+    colors:
+      categorical:
+        - "#E63946"  # Red
+        - "#F1FAEE"  # White
+        - "#A8DADC"  # Light blue
+        - "#457B9D"  # Medium blue
+        - "#1D3557"  # Dark blue
+      sequential:
+        - "#F1FAEE"
+        - "#A8DADC"
+        - "#457B9D"
+        - "#1D3557"
+      diverging:
+        - "#E63946"
+        - "#F4A261"
+        - "#E9C46A"
+        - "#2A9D8F"
+        - "#264653"
+      qualitative:
+        - "#E63946"
+        - "#F1FAEE"
+        - "#A8DADC"
+        - "#457B9D"
+        - "#1D3557"
+        - "#2A9D8F"
+        - "#E9C46A"
+        - "#F4A261"
+
+  # High contrast palette for presentations
+  - name: "high-contrast"
+    description: "High contrast colors optimized for presentations"
+    colors:
+      categorical:
+        - "#FF0000"  # Red
+        - "#00FF00"  # Green
+        - "#0000FF"  # Blue
+        - "#FFFF00"  # Yellow
+        - "#FF00FF"  # Magenta
+        - "#00FFFF"  # Cyan
+      sequential:
+        - "#FFFFE0"
+        - "#FFFF00"
+        - "#FFD700"
+        - "#FFA500"
+        - "#FF4500"
+        - "#FF0000"
+      diverging:
+        - "#0000FF"
+        - "#1E90FF"
+        - "#00BFFF"
+        - "#87CEEB"
+        - "#E0FFFF"
+        - "#FFFFFF"
+        - "#FFE4E1"
+        - "#FFB6C1"
+        - "#FF69B4"
+        - "#FF1493"
+        - "#FF0000"
+      qualitative:
+        - "#E63946"
+        - "#F1FAEE"
+        - "#A8DADC"
+        - "#457B9D"
+        - "#1D3557"
+        - "#2A9D8F"
+        - "#E9C46A"
+        - "#F4A261"
