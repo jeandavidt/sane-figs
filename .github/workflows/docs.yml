@@ -33,14 +33,11 @@ jobs:
           uv sync --all-extras
           uv run playwright install chromium --with-deps
 
-      - name: Export interactive notebook to WASM
-        run: uv run marimo export html-wasm examples/interactive_demo.py --mode run --no-show-code -o docs/interactive_demo.html -f
-
-      - name: Generate figures
-        run: uv run python -m docs_scripts.generate_figures
-
       - name: Build docs
         run: uv run mkdocs build
+
+      - name: Export interactive notebook to WASM
+        run: uv run marimo export html-wasm examples/interactive_demo.py --mode run --no-show-code -o site/interactive_demo.html -f
 
       - uses: actions/upload-pages-artifact@v3
         with:

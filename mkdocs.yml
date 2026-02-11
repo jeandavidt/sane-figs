@@ -2,6 +2,9 @@ site_name: Sane-Figs
 site_url: https://jeandavidt.github.io/sane-figs/
 repo_url: https://github.com/jeandavidt/sane-figs
 
+docs_dir: docs_source
+site_dir: site
+
 nav:
   - Home: index.md
   - Presets: presets.md

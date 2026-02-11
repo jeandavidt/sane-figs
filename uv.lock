@@ -5767,6 +5767,10 @@ dev = [
     { name = "pymdown-extensions", version = "10.20.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "sane-figs" },
 ]
+docs = [
+    { name = "kaleido" },
+    { name = "vl-convert-python" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -5814,6 +5818,10 @@ dev = [
     { name = "plotly", specifier = ">=6.5.2" },
     { name = "pymdown-extensions", specifier = ">=10.0" },
     { name = "sane-figs", editable = "." },
+]
+docs = [
+    { name = "kaleido", specifier = ">=1.2.0" },
+    { name = "vl-convert-python", specifier = ">=1.9.0.post1" },
 ]
 
 [[package]]

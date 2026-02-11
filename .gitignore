@@ -122,5 +122,13 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Documentation images (generated)
-docs/
+# Documentation (generated artifacts — only track markdown source files)
+docs/images/
+docs/assets/
+docs/interactive_demo.html
+docs/*.png
+docs/*.ico
+docs/*.json
+docs/site.webmanifest
+docs/logo.png
+docs/.nojekyll
