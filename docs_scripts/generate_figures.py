@@ -16,7 +16,7 @@ import sane_figs
 from pathlib import Path
 
 # Create output directory
-output_dir = Path(__file__).parent.parent / "docs" / "images"
+output_dir = Path(__file__).parent.parent / "docs_source" / "images"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Common data
