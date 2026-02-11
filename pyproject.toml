@@ -82,6 +82,10 @@ test = [
 docs = [
     "mkdocs>=1.5.0",
     "pymdown-extensions>=10.0",
+    "kaleido==0.2.1",
+    "playwright>=1.40.0",
+    "vl-convert-python>=1.0.0",
+    "marimo>=0.8.22",
 ]
 
 [project.urls]

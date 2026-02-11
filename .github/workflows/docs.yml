@@ -31,8 +31,10 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --all-extras
-          uv pip install kaleido playwright vl-convert-python
           uv run playwright install chromium --with-deps
+
+      - name: Export interactive notebook to WASM
+        run: uv run marimo export html-wasm examples/interactive_demo.py --mode run --no-show-code -o docs/interactive_demo.html -f
 
       - name: Generate figures
         run: uv run python -m docs_scripts.generate_figures
