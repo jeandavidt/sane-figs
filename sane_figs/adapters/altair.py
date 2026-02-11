@@ -343,12 +343,17 @@ class AltairAdapter(BaseAdapter):
             # Conversion: pixels = points * (DPI / 72)
             dpi_scale = preset.dpi / 72.0
 
+            # For Altair charts (which are displayed primarily on screens),
+            # use a screen-appropriate DPI (96-100) instead of print DPI
+            # to calculate pixel dimensions, while keeping the aspect ratio
+            screen_dpi = 100
+            
             # Create the base theme config
             base_theme_config = {
                 "config": {
                     "view": {
-                        "width": int(preset.figure_size[0] * preset.dpi),
-                        "height": int(preset.figure_size[1] * preset.dpi),
+                        "width": int(preset.figure_size[0] * screen_dpi),
+                        "height": int(preset.figure_size[1] * screen_dpi),
                         # Remove border around the chart (matches spines.top/right=False)
                         "stroke": "transparent",
                     },
