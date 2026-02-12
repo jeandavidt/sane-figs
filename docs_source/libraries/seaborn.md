@@ -29,7 +29,7 @@ plt.title('Histogram with Seaborn')
 plt.savefig('figure.png', dpi=300)
 ```
 
-![Basic Seaborn Example](../images/seaborn_basic.png)
+![Basic Seaborn Example](../assets/images/seaborn_basic.png)
 
 ## Distribution Plots
 
@@ -56,7 +56,7 @@ plt.savefig('seaborn_histogram.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Histogram](../images/seaborn_histogram.png)
+![Seaborn Histogram](../assets/images/seaborn_histogram.png)
 
 ### Box Plot
 
@@ -81,7 +81,7 @@ plt.savefig('seaborn_boxplot.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Box Plot](../images/seaborn_boxplot.png)
+![Seaborn Box Plot](../assets/images/seaborn_boxplot.png)
 
 ### Violin Plot
 
@@ -106,7 +106,7 @@ plt.savefig('seaborn_violin.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Violin Plot](../images/seaborn_violin.png)
+![Seaborn Violin Plot](../assets/images/seaborn_violin.png)
 
 ## Categorical Plots
 
@@ -134,7 +134,7 @@ plt.savefig('seaborn_barplot.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Bar Plot](../images/seaborn_barplot.png)
+![Seaborn Bar Plot](../assets/images/seaborn_barplot.png)
 
 ### Count Plot
 
@@ -159,7 +159,7 @@ plt.savefig('seaborn_countplot.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Count Plot](../images/seaborn_countplot.png)
+![Seaborn Count Plot](../assets/images/seaborn_countplot.png)
 
 ## Relational Plots
 
@@ -187,7 +187,7 @@ plt.savefig('seaborn_scatter.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Scatter Plot](../images/seaborn_scatter.png)
+![Seaborn Scatter Plot](../assets/images/seaborn_scatter.png)
 
 ### Line Plot
 
@@ -212,7 +212,7 @@ plt.savefig('seaborn_lineplot.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Line Plot](../images/seaborn_lineplot.png)
+![Seaborn Line Plot](../assets/images/seaborn_lineplot.png)
 
 ## Matrix Plots
 
@@ -236,7 +236,7 @@ plt.savefig('seaborn_heatmap.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Heatmap](../images/seaborn_heatmap.png)
+![Seaborn Heatmap](../assets/images/seaborn_heatmap.png)
 
 ## Regression Plots
 
@@ -264,7 +264,7 @@ plt.savefig('seaborn_regplot.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Regression Plot](../images/seaborn_regplot.png)
+![Seaborn Regression Plot](../assets/images/seaborn_regplot.png)
 
 ## Using Colorways
 
@@ -290,7 +290,7 @@ plt.savefig('seaborn_colorway.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Colorway](../images/seaborn_colorway.png)
+![Seaborn Colorway](../assets/images/seaborn_colorway.png)
 
 ## Using Watermarks
 
@@ -315,7 +315,7 @@ plt.savefig('seaborn_watermark.png', dpi=300)
 plt.close()
 ```
 
-![Seaborn Watermark](../images/seaborn_watermark.png)
+![Seaborn Watermark](../assets/images/seaborn_watermark.png)
 
 ## Per-Library Setup
 

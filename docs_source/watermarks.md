@@ -25,7 +25,7 @@ plt.title('Figure with Text Watermark')
 plt.savefig('text_watermark.png')
 ```
 
-![Text Watermark](images/watermark_text.png)
+![Text Watermark](assets/images/watermark_text.png)
 
 ## Image Watermarks
 
@@ -50,7 +50,7 @@ plt.title('Figure with Image Watermark')
 plt.savefig('image_watermark.png')
 ```
 
-![Image Watermark](images/watermark_image.png)
+![Image Watermark](assets/images/watermark_image.png)
 
 ## Watermark Positions
 
@@ -82,10 +82,10 @@ for pos in positions:
     plt.close()
 ```
 
-![Watermark Top Left](images/watermark_top-left.png)
-![Watermark Top Right](images/watermark_top-right.png)
-![Watermark Bottom Left](images/watermark_bottom-left.png)
-![Watermark Bottom Right](images/watermark_bottom-right.png)
+![Watermark Top Left](assets/images/watermark_top-left.png)
+![Watermark Top Right](assets/images/watermark_top-right.png)
+![Watermark Bottom Left](assets/images/watermark_bottom-left.png)
+![Watermark Bottom Right](assets/images/watermark_bottom-right.png)
 
 ## Customizing Text Watermarks
 
@@ -278,4 +278,4 @@ plt.title('Effective Watermark')
 plt.savefig('effective_watermark.png')
 ```
 
-![Effective Watermark](images/watermark_effective.png)
+![Effective Watermark](assets/images/watermark_effective.png)

@@ -8,7 +8,7 @@ Sane-Figs provides publication-ready color palettes (colorways) that are optimiz
 
 The default colorway is optimized for print publication with high contrast and readability.
 
-![Default Colorway](images/colorway_default.png)
+![Default Colorway](assets/images/colorway_default.png)
 
 ```python
 import sane_figs
@@ -19,7 +19,7 @@ sane_figs.setup(mode='article', colorway='default')
 
 Earth tones inspired by nature, perfect for environmental and biological publications.
 
-![Nature Colorway](images/colorway_nature.png)
+![Nature Colorway](assets/images/colorway_nature.png)
 
 ```python
 import sane_figs
@@ -30,7 +30,7 @@ sane_figs.setup(mode='article', colorway='nature')
 
 High contrast colors optimized for presentations and slides.
 
-![Vibrant Colorway](images/colorway_vibrant.png)
+![Vibrant Colorway](assets/images/colorway_vibrant.png)
 
 ```python
 import sane_figs
@@ -41,7 +41,7 @@ sane_figs.setup(mode='article', colorway='vibrant')
 
 Soft, professional colors suitable for business and corporate publications.
 
-![Pastel Colorway](images/colorway_pastel.png)
+![Pastel Colorway](assets/images/colorway_pastel.png)
 
 ```python
 import sane_figs
@@ -52,7 +52,7 @@ sane_figs.setup(mode='article', colorway='pastel')
 
 Designed for colorblind accessibility, ensuring your figures are readable by everyone.
 
-![Colorblind-Safe Colorway](images/colorway_colorblind-safe.png)
+![Colorblind-Safe Colorway](assets/images/colorway_colorblind-safe.png)
 
 ```python
 import sane_figs
@@ -103,7 +103,7 @@ plt.title('Nature Colorway Example')
 plt.savefig('figure.png')
 ```
 
-![Nature Colorway Example](images/colorway_example.png)
+![Nature Colorway Example](assets/images/colorway_example.png)
 
 ### Multiple Plots with Different Colorways
 
@@ -200,4 +200,4 @@ plt.title('Accessible Figure')
 plt.savefig('accessible_figure.png')
 ```
 
-![Accessible Figure Example](images/accessible_figure.png)
+![Accessible Figure Example](assets/images/accessible_figure.png)

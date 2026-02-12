@@ -16,7 +16,7 @@ import sane_figs
 from pathlib import Path
 
 # Create output directory
-output_dir = Path(__file__).parent.parent / "docs_source" / "images"
+output_dir = Path(__file__).parent.parent / "docs_source" / "assets" / "images"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Common data
@@ -57,11 +57,8 @@ save_mpl("basic_usage.png")
 print("\n[2/7] Generating Presets page figures...")
 
 # Article vs Presentation comparison
-# Use a shared figsize so only the font/line styling differs
-demo_figsize = (8, 5)
-
 sane_figs.setup(mode="article")
-plt.figure(figsize=demo_figsize)
+plt.figure()
 plt.plot(x, y1, label="sin(x)")
 plt.plot(x, y2, label="cos(x)")
 plt.legend()
@@ -71,7 +68,7 @@ plt.ylabel("y")
 save_mpl("article_mode.png")
 
 sane_figs.setup(mode="presentation")
-plt.figure(figsize=demo_figsize)
+plt.figure()
 plt.plot(x, y, label="sin(x)")
 plt.title("Sine Wave (Presentation Mode)")
 plt.xlabel("x")
@@ -281,9 +278,9 @@ plt.ylabel("Frequency")
 plt.grid(True, alpha=0.3, axis="y")
 save_mpl("matplotlib_histogram.png")
 
-# Subplots - needs explicit figsize for side-by-side panels
+# Subplots
 sane_figs.setup(mode="article")
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 2.625))
+fig, (ax1, ax2) = plt.subplots(1, 2)
 ax1.plot(x, y1)
 ax1.set_title("Sine Wave")
 ax1.set_xlabel("x")
@@ -580,7 +577,7 @@ fig = px.violin(df_box, x="Group", y="Value", title="Violin Plot")
 fig.update_layout(showlegend=False)
 save_plotly(fig, "plotly_violin.png")
 
-# Subplots - needs explicit sizing for multi-panel layout
+# Subplots
 sane_figs.setup(mode="article")
 fig = make_subplots(
     rows=1, cols=2, subplot_titles=("Sine Wave", "Cosine Wave")
@@ -594,7 +591,7 @@ fig.add_trace(
 fig.update_xaxes(title_text="x")
 fig.update_yaxes(title_text="sin(x)", row=1, col=1)
 fig.update_yaxes(title_text="cos(x)", row=1, col=2)
-fig.update_layout(showlegend=True, width=1200, height=500)
+fig.update_layout(showlegend=True)
 save_plotly(fig, "plotly_subplots.png")
 
 # Colorway
@@ -776,7 +773,7 @@ chart = (
 )
 save_altair(chart, "altair_area.png")
 
-# Subplots (faceting) - needs explicit width for faceted panels
+# Subplots (faceting)
 sane_figs.setup(mode="article")
 df_facet = pd.DataFrame(
     {"x": x, "sin(x)": np.sin(x), "cos(x)": np.cos(x)}
@@ -790,7 +787,6 @@ chart = (
         y=alt.Y("y", title="y"),
         color=alt.Color("Function", legend=alt.Legend(title="Function")),
     )
-    .properties(width=300, height=300)
     .facet(column=alt.Column("Function", title=None))
     .properties(title="Subplots")
 )

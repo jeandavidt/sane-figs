@@ -132,3 +132,18 @@ docs/*.json
 docs/site.webmanifest
 docs/logo.png
 docs/.nojekyll
+
+# MkDocs generated assets
+docs_source/assets/
+docs_source/*.html
+
+# Marimo export artifacts
+docs_source/.nojekyll
+docs_source/CLAUDE.md
+docs_source/*.png
+docs_source/*.ico
+docs_source/*.json
+docs_source/*.webmanifest
+
+.DS_Store
+uv.lock

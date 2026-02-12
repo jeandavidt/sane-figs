@@ -5765,6 +5765,9 @@ dev = [
     { name = "plotly" },
     { name = "pymdown-extensions", version = "10.15", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pymdown-extensions", version = "10.20.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "pytest", version = "8.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
+    { name = "pytest", version = "9.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "sane-figs" },
 ]
 docs = [
@@ -5817,6 +5820,7 @@ dev = [
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "plotly", specifier = ">=6.5.2" },
     { name = "pymdown-extensions", specifier = ">=10.0" },
+    { name = "pytest", specifier = ">=8.3.5" },
     { name = "sane-figs", editable = "." },
 ]
 docs = [

@@ -28,7 +28,7 @@ plt.ylabel('sin(x)')
 plt.savefig('figure.png', dpi=300)
 ```
 
-![Basic Matplotlib Example](../images/matplotlib_basic.png)
+![Basic Matplotlib Example](../assets/images/matplotlib_basic.png)
 
 ## Line Plots
 
@@ -52,7 +52,7 @@ plt.grid(True, alpha=0.3)
 plt.savefig('line_plot.png', dpi=300)
 ```
 
-![Simple Line Plot](../images/matplotlib_line.png)
+![Simple Line Plot](../assets/images/matplotlib_line.png)
 
 ### Multiple Lines
 
@@ -79,7 +79,7 @@ plt.grid(True, alpha=0.3)
 plt.savefig('multiple_lines.png', dpi=300)
 ```
 
-![Multiple Lines](../images/matplotlib_multiple_lines.png)
+![Multiple Lines](../assets/images/matplotlib_multiple_lines.png)
 
 ## Scatter Plots
 
@@ -104,7 +104,7 @@ plt.grid(True, alpha=0.3)
 plt.savefig('scatter_plot.png', dpi=300)
 ```
 
-![Scatter Plot](../images/matplotlib_scatter.png)
+![Scatter Plot](../assets/images/matplotlib_scatter.png)
 
 ## Bar Charts
 
@@ -126,7 +126,7 @@ plt.grid(True, alpha=0.3, axis='y')
 plt.savefig('bar_chart.png', dpi=300)
 ```
 
-![Bar Chart](../images/matplotlib_bar.png)
+![Bar Chart](../assets/images/matplotlib_bar.png)
 
 ## Histograms
 
@@ -148,7 +148,7 @@ plt.grid(True, alpha=0.3, axis='y')
 plt.savefig('histogram.png', dpi=300)
 ```
 
-![Histogram](../images/matplotlib_histogram.png)
+![Histogram](../assets/images/matplotlib_histogram.png)
 
 ## Subplots
 
@@ -181,7 +181,7 @@ plt.tight_layout()
 plt.savefig('subplots.png', dpi=300)
 ```
 
-![Subplots](../images/matplotlib_subplots.png)
+![Subplots](../assets/images/matplotlib_subplots.png)
 
 ## Using Colorways
 
@@ -208,7 +208,7 @@ plt.grid(True, alpha=0.3)
 plt.savefig('colorway_example.png', dpi=300)
 ```
 
-![Colorway Example](../images/matplotlib_colorway.png)
+![Colorway Example](../assets/images/matplotlib_colorway.png)
 
 ## Using Watermarks
 
@@ -233,7 +233,7 @@ plt.grid(True, alpha=0.3)
 plt.savefig('watermark_example.png', dpi=300)
 ```
 
-![Watermark Example](../images/matplotlib_watermark.png)
+![Watermark Example](../assets/images/matplotlib_watermark.png)
 
 ## Context Manager
 

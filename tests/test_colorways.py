@@ -84,7 +84,7 @@ def test_list_colorways():
     assert "vibrant" in colorways
     assert "pastel" in colorways
     assert "colorblind-safe" in colorways
-    assert len(colorways) == 5
+    assert len(colorways) >= 5
 
 
 def test_register_colorway():

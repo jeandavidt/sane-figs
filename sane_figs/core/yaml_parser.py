@@ -187,6 +187,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
     from sane_figs.core.presets import Preset
     from sane_figs.styling.colorways import get_colorway
     from sane_figs.styling.watermarks import WatermarkConfig
+    from sane_figs.styling.layout import TitleConfig, LegendConfig, AxisTitleSpacingConfig
 
     # Required fields
     if "name" not in data:
@@ -239,6 +240,45 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
         watermark_data = data["watermark"]
         watermark = _parse_watermark_from_dict(watermark_data, base_path)
 
+    # Parse title configuration
+    title_config = None
+    if "title" in data:
+        title_data = data["title"]
+        alignment = title_data.get("alignment", "center")
+        title_config = TitleConfig(alignment=alignment)
+
+    # Parse legend configuration
+    legend_config = None
+    if "legend" in data:
+        legend_data = data["legend"]
+        position = legend_data.get("position", "inside_upper_right")
+        alignment = legend_data.get("alignment", "center")
+        x_offset = legend_data.get("x_offset", 0.0)
+        y_offset = legend_data.get("y_offset", 0.0)
+        legend_config = LegendConfig(
+            position=position,
+            alignment=alignment,
+            x_offset=x_offset,
+            y_offset=y_offset,
+        )
+
+    # Parse axis title spacing configuration
+    axis_title_spacing = None
+    if "axis_title_spacing" in data:
+        spacing_data = data["axis_title_spacing"]
+        x_spacing = spacing_data.get("x_spacing", 8.0)
+        y_spacing = spacing_data.get("y_spacing", 8.0)
+        plotly_multiplier = spacing_data.get("plotly_multiplier", 1.5)
+        altair_multiplier = spacing_data.get("altair_multiplier", 1.2)
+        matplotlib_multiplier = spacing_data.get("matplotlib_multiplier", 1.0)
+        axis_title_spacing = AxisTitleSpacingConfig(
+            x_spacing=x_spacing,
+            y_spacing=y_spacing,
+            plotly_multiplier=plotly_multiplier,
+            altair_multiplier=altair_multiplier,
+            matplotlib_multiplier=matplotlib_multiplier,
+        )
+
     # Create preset
     preset = Preset(
         name=data["name"],
@@ -251,6 +291,9 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
         marker_size=marker_size,
         colorway=colorway,
         watermark=watermark,
+        title_config=title_config,
+        legend_config=legend_config,
+        axis_title_spacing=axis_title_spacing,
     )
 
     # Validate preset
@@ -535,6 +578,35 @@ colorway:
 #       - "#2A9D8F"
 #       - "#E9C46A"
 #       - "#F4A261"
+
+# Title configuration (optional)
+title:
+  # Title alignment: "left", "center", or "right"
+  alignment: "center"
+
+# Legend configuration (optional)
+legend:
+  # Legend position:
+  # Inside: "inside_upper_right", "inside_upper_left", "inside_lower_right",
+  #         "inside_lower_left", "inside_center"
+  # Outside: "outside_right", "outside_left", "outside_top", "outside_bottom"
+  position: "inside_upper_right"
+  # Legend alignment when positioned outside: "start", "center", "end"
+  alignment: "center"
+  # Offset from anchor position (0-1 scale)
+  x_offset: 0.0
+  y_offset: 0.0
+
+# Axis title spacing configuration (optional)
+axis_title_spacing:
+  # Horizontal spacing for x-axis title (in points)
+  x_spacing: 8.0
+  # Vertical spacing for y-axis title (in points)
+  y_spacing: 8.0
+  # Library-specific multipliers to normalize spacing across libraries
+  plotly_multiplier: 1.5  # Plotly tends to have tighter spacing
+  altair_multiplier: 1.2  # Altair spacing adjustment
+  matplotlib_multiplier: 1.0  # Matplotlib is the baseline
 
 # Watermark settings (optional - comment out to disable)
 watermark:

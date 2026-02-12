@@ -35,7 +35,7 @@ chart = alt.Chart(df).mark_line().encode(
 chart.save('figure.png')
 ```
 
-![Basic Altair Example](../images/altair_basic.png)
+![Basic Altair Example](../assets/images/altair_basic.png)
 
 ## Line Plots
 
@@ -65,7 +65,7 @@ chart = alt.Chart(df).mark_line(strokeWidth=2).encode(
 chart.save('altair_line.png')
 ```
 
-![Altair Line Plot](../images/altair_line.png)
+![Altair Line Plot](../assets/images/altair_line.png)
 
 ### Multiple Lines
 
@@ -100,7 +100,7 @@ chart = alt.Chart(df_long).mark_line(strokeWidth=2).encode(
 chart.save('altair_multiple_lines.png')
 ```
 
-![Altair Multiple Lines](../images/altair_multiple_lines.png)
+![Altair Multiple Lines](../assets/images/altair_multiple_lines.png)
 
 ## Scatter Plots
 
@@ -132,7 +132,7 @@ chart = alt.Chart(df).mark_circle(size=50, opacity=0.7).encode(
 chart.save('altair_scatter.png')
 ```
 
-![Altair Scatter Plot](../images/altair_scatter.png)
+![Altair Scatter Plot](../assets/images/altair_scatter.png)
 
 ## Bar Charts
 
@@ -160,7 +160,7 @@ chart = alt.Chart(df).mark_bar().encode(
 chart.save('altair_bar.png')
 ```
 
-![Altair Bar Chart](../images/altair_bar.png)
+![Altair Bar Chart](../assets/images/altair_bar.png)
 
 ## Histograms
 
@@ -189,7 +189,7 @@ chart = alt.Chart(df).mark_bar(opacity=0.7).encode(
 chart.save('altair_histogram.png')
 ```
 
-![Altair Histogram](../images/altair_histogram.png)
+![Altair Histogram](../assets/images/altair_histogram.png)
 
 ## Box Plots
 
@@ -220,7 +220,7 @@ chart = alt.Chart(df).mark_boxplot().encode(
 chart.save('altair_box.png')
 ```
 
-![Altair Box Plot](../images/altair_box.png)
+![Altair Box Plot](../assets/images/altair_box.png)
 
 ## Area Charts
 
@@ -254,7 +254,7 @@ chart = alt.Chart(df_long).mark_area(opacity=0.5).encode(
 chart.save('altair_area.png')
 ```
 
-![Altair Area Chart](../images/altair_area.png)
+![Altair Area Chart](../assets/images/altair_area.png)
 
 ## Subplots (Faceting)
 
@@ -291,7 +291,7 @@ chart = alt.Chart(df_long).mark_line(strokeWidth=2).encode(
 chart.save('altair_subplots.png')
 ```
 
-![Altair Subplots](../images/altair_subplots.png)
+![Altair Subplots](../assets/images/altair_subplots.png)
 
 ## Using Colorways
 
@@ -326,7 +326,7 @@ chart = alt.Chart(df_long).mark_line(strokeWidth=2).encode(
 chart.save('altair_colorway.png')
 ```
 
-![Altair Colorway](../images/altair_colorway.png)
+![Altair Colorway](../assets/images/altair_colorway.png)
 
 ## Using Watermarks
 
@@ -354,7 +354,7 @@ chart = alt.Chart(df).mark_line(strokeWidth=2).encode(
 chart.save('altair_watermark.png')
 ```
 
-![Altair Watermark](../images/altair_watermark.png)
+![Altair Watermark](../assets/images/altair_watermark.png)
 
 ## Per-Library Setup
 

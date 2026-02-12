@@ -7,11 +7,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sane_figs.styling.colorways import Colorway
     from sane_figs.styling.watermarks import WatermarkConfig
+    from sane_figs.styling.layout import TitleConfig, LegendConfig, AxisTitleSpacingConfig
 
 from sane_figs.styling.colorways import (
     ULAVAL_COLORWAY,
     MODELEAU_COLORWAY,
     MARIMO_COLORWAY,
+)
+from sane_figs.styling.layout import (
+    TitleConfig,
+    LegendConfig,
+    AxisTitleSpacingConfig,
 )
 
 
@@ -31,6 +37,9 @@ class Preset:
         marker_size: Marker size for scatter plots.
         colorway: Colorway to use.
         watermark: Optional watermark configuration.
+        title_config: Configuration for title alignment.
+        legend_config: Configuration for legend positioning.
+        axis_title_spacing: Configuration for axis title spacing.
     """
 
     name: str
@@ -43,6 +52,9 @@ class Preset:
     marker_size: float = 6.0
     colorway: "Colorway | None" = None
     watermark: "WatermarkConfig | None" = None
+    title_config: "TitleConfig | None" = None
+    legend_config: "LegendConfig | None" = None
+    axis_title_spacing: "AxisTitleSpacingConfig | None" = None
 
 
 # Preset registry
@@ -169,7 +181,10 @@ def load_config() -> None:
     This function searches for configuration files in standard locations
     and loads all presets and colorways found.
     """
-    from sane_figs.core.config_discovery import load_all_discovered_colorways, load_all_discovered_presets
+    from sane_figs.core.config_discovery import (
+        load_all_discovered_colorways,
+        load_all_discovered_presets,
+    )
     from sane_figs.styling.colorways import register_colorway
 
     # Load presets
@@ -217,23 +232,24 @@ _ARTICLE_PRESET = Preset(
 )
 
 # Presentation Mode Preset
-# Optimized for 16:9 widescreen slides.
-# 20pt minimum ensures readability from the back of a room.
+# Optimized for figures on 16:9 widescreen slides.
+# Sized to occupy ~75% of slide area, leaving room for titles and margins.
+# Should be barely readable when printed 4-up on US letter (8.5"×11") paper.
 _PRESENTATION_PRESET = Preset(
     name="presentation",
     mode="presentation",
-    figure_size=(13.33, 7.5),  # 16:9 widescreen slide dimensions
+    figure_size=(10.0, 5.6),  # ~75% of 16:9 slide area (13.33"×7.5" full slide)
     dpi=150,  # Sufficient for screen/projector (~full HD output)
     font_family="sans-serif",
     font_size={
-        "title": 28.0,
-        "label": 24.0,
-        "legend": 20.0,
-        "tick": 20.0,
-        "annotation": 20.0,
+        "title": 24.0,
+        "label": 20.0,
+        "legend": 18.0,
+        "tick": 18.0,
+        "annotation": 18.0,
     },
-    line_width=3.0,
-    marker_size=10.0,
+    line_width=2.5,
+    marker_size=9.0,
     colorway=None,  # Will be set to VIBRANT_COLORWAY
     watermark=None,
 )

@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from sane_figs.core.presets import Preset
     from sane_figs.styling.colorways import Colorway
     from sane_figs.styling.watermarks import WatermarkConfig
+    from sane_figs.styling.layout import TitleConfig, LegendConfig, AxisTitleSpacingConfig
 
 from sane_figs.adapters.base import BaseAdapter
 
@@ -32,6 +33,9 @@ class SeabornAdapter(BaseAdapter):
         self._seaborn = None
         self._original_theme = None
         self._original_context = None
+        self._watermark_config = None
+        self._original_savefig = None
+        self._pyplot = None
 
     def _import_seaborn(self) -> bool:
         """
@@ -42,8 +46,10 @@ class SeabornAdapter(BaseAdapter):
         """
         try:
             import seaborn as sns
+            import matplotlib.pyplot as plt
 
             self._seaborn = sns
+            self._pyplot = plt
             return True
         except Exception:
             return False
@@ -97,6 +103,18 @@ class SeabornAdapter(BaseAdapter):
         if preset.watermark is not None:
             self.add_watermark(preset.watermark)
 
+        # Apply title config if specified
+        if preset.title_config is not None:
+            self.apply_title_config(preset.title_config)
+
+        # Apply legend config if specified
+        if preset.legend_config is not None:
+            self.apply_legend_config(preset.legend_config)
+
+        # Apply axis title spacing if specified
+        if preset.axis_title_spacing is not None:
+            self.apply_axis_title_spacing(preset.axis_title_spacing)
+
     def reset_style(self) -> None:
         """
         Reset Seaborn styling to its original state.
@@ -115,6 +133,13 @@ class SeabornAdapter(BaseAdapter):
         # Reset color palette
         self._seaborn.set_palette(self._seaborn.color_palette())
 
+        # Restore original savefig if we patched it
+        if self._original_savefig is not None and self._pyplot is not None:
+            self._pyplot.savefig = self._original_savefig
+            self._original_savefig = None
+
+        self._watermark_config = None
+
     def apply_colorway(self, colorway: "Colorway") -> None:
         """
         Apply a colorway to Seaborn.
@@ -132,8 +157,8 @@ class SeabornAdapter(BaseAdapter):
         """
         Add a watermark to Seaborn figures.
 
-        Note: Seaborn uses Matplotlib under the hood, so we delegate
-        watermark handling to the Matplotlib adapter.
+        Seaborn uses Matplotlib under the hood, so we patch plt.savefig
+        to automatically add watermarks before saving.
 
         Args:
             config: The WatermarkConfig object containing watermark settings.
@@ -141,25 +166,31 @@ class SeabornAdapter(BaseAdapter):
         if not self.is_available():
             return
 
-        # Seaborn uses Matplotlib, so we need to apply the watermark
-        # through Matplotlib's figure creation
-        try:
-            import matplotlib.pyplot as plt
+        # Store watermark config
+        self._watermark_config = config
 
-            # Store watermark config for use when figures are created
-            self._watermark_config = config
+        # Save original savefig if not already saved
+        if self._original_savefig is None:
+            self._original_savefig = self._pyplot.savefig
 
-            # Register a callback to add watermark to new figures
-            original_figure = plt.Figure
+        # Create a wrapped savefig that adds watermark
+        adapter_self = self
+        original_savefig = self._original_savefig
 
-            def figure_with_watermark(*args, **kwargs):
-                fig = original_figure(*args, **kwargs)
-                self._add_watermark_to_figure(fig, config)
-                return fig
+        def savefig_with_watermark(fname, **kwargs):
+            """Save figure with watermark added."""
+            # Get current figure
+            fig = adapter_self._pyplot.gcf()
+            
+            # Add watermark to the figure
+            if adapter_self._watermark_config is not None:
+                adapter_self._add_watermark_to_figure(fig, adapter_self._watermark_config)
+            
+            # Call original savefig
+            return original_savefig(fname, **kwargs)
 
-            plt.Figure = figure_with_watermark
-        except Exception:
-            pass
+        # Patch savefig
+        self._pyplot.savefig = savefig_with_watermark
 
     def _add_watermark_to_figure(self, fig, config: "WatermarkConfig") -> None:
         """
@@ -169,99 +200,147 @@ class SeabornAdapter(BaseAdapter):
             fig: The Matplotlib figure.
             config: The WatermarkConfig object.
         """
-        from PIL import Image
+        if config.text is not None:
+            self._add_text_watermark(fig, config)
+        elif config.image_path is not None:
+            self._add_image_watermark(fig, config)
 
-        fig_width, fig_height = fig.get_size_inches()
-        dpi = fig.dpi
-        fig_width_px = fig_width * dpi
-        fig_height_px = fig_height * dpi
-
-        if config.image_path is not None:
-            # Image watermark
-            try:
-                img = Image.open(config.image_path)
-                img_width = int(fig_width_px * config.scale)
-                img_height = int(img_width * (img.height / img.width))
-
-                # Resize image
-                img = img.resize((img_width, img_height), Image.Resampling.LANCZOS)
-
-                # Calculate position
-                from sane_figs.styling.watermarks import get_watermark_position
-
-                x, y = get_watermark_position(
-                    config.position,
-                    fig_width_px,
-                    fig_height_px,
-                    img_width,
-                    img_height,
-                    config.margin[0],
-                    config.margin[1],
-                )
-
-                # Add image to figure
-                from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-
-                imagebox = OffsetImage(img, zoom=1.0, alpha=config.opacity)
-                ab = AnnotationBbox(
-                    imagebox, (x / dpi, y / dpi), frameon=False, zorder=100
-                )
-                fig.add_artist(ab)
-            except Exception:
-                # If image loading fails, fall back to text watermark
-                if config.text is not None:
-                    self._add_text_watermark(fig, config, fig_width_px, fig_height_px)
-
-        elif config.text is not None:
-            # Text watermark
-            self._add_text_watermark(fig, config, fig_width_px, fig_height_px)
-
-    def _add_text_watermark(self, fig, config: "WatermarkConfig", fig_width_px: float, fig_height_px: float) -> None:
+    def _add_text_watermark(self, fig, config: "WatermarkConfig") -> None:
         """
-        Add a text watermark to a figure.
+        Add a text watermark to a figure using figure coordinates.
 
         Args:
             fig: The Matplotlib figure.
             config: The WatermarkConfig object.
-            fig_width_px: Figure width in pixels.
-            fig_height_px: Figure height in pixels.
         """
-        from sane_figs.styling.watermarks import get_watermark_position
+        # Calculate position in figure coordinates (0-1)
+        x, y, ha, va = self._get_watermark_position(config)
 
-        # Estimate text size (rough approximation)
-        font_size = config.font_size
-        text_width = len(config.text) * font_size * 0.6
-        text_height = font_size * 1.2
-
-        # Calculate position
-        x, y = get_watermark_position(
-            config.position,
-            fig_width_px,
-            fig_height_px,
-            text_width,
-            text_height,
-            config.margin[0],
-            config.margin[1],
-        )
-
-        # Convert to figure coordinates
-        x_fig = x / fig.dpi
-        y_fig = y / fig.dpi
-
-        # Add text annotation
+        # Add text watermark using figure coordinates
         fig.text(
-            x_fig,
-            y_fig,
+            x,
+            y,
             config.text,
-            fontsize=font_size,
+            transform=fig.transFigure,
+            fontsize=config.font_size,
             fontfamily=config.font_family,
             fontweight=config.font_weight,
             color=config.font_color,
             alpha=config.opacity,
-            ha="left",
-            va="bottom",
-            zorder=100,
+            ha=ha,
+            va=va,
+            zorder=1000,
         )
+
+    def _add_image_watermark(self, fig, config: "WatermarkConfig") -> None:
+        """
+        Add an image watermark to a figure using axes overlay approach.
+
+        This method adds the watermark as an inset axes, which works correctly
+        with bbox_inches='tight' and other savefig options.
+
+        Args:
+            fig: The Matplotlib figure.
+            config: The WatermarkConfig object.
+        """
+        try:
+            from PIL import Image
+            import numpy as np
+
+            # Load image
+            img = Image.open(config.image_path)
+
+            # Convert to RGBA if necessary
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+
+            # Apply opacity by modifying alpha channel
+            if config.opacity < 1.0:
+                # Get the alpha channel and multiply by opacity
+                alpha = img.split()[-1]
+                alpha = alpha.point(lambda p: int(p * config.opacity))
+                img.putalpha(alpha)
+
+            # Convert to numpy array
+            img_array = np.array(img)
+
+            # Get image aspect ratio
+            img_aspect = img.width / img.height
+
+            # Calculate watermark size in figure coordinates
+            watermark_width = config.scale
+            watermark_height = watermark_width / img_aspect
+
+            # Calculate position in figure coordinates (0-1)
+            margin_x = config.margin[0]
+            margin_y = config.margin[1]
+
+            if config.position == "top-left":
+                x = margin_x
+                y = 1 - margin_y - watermark_height
+            elif config.position == "top-right":
+                x = 1 - margin_x - watermark_width
+                y = 1 - margin_y - watermark_height
+            elif config.position == "bottom-left":
+                x = margin_x
+                y = margin_y
+            elif config.position == "bottom-right":
+                x = 1 - margin_x - watermark_width
+                y = margin_y
+            elif config.position == "center":
+                x = (1 - watermark_width) / 2
+                y = (1 - watermark_height) / 2
+            else:
+                x = 1 - margin_x - watermark_width
+                y = margin_y
+
+            # Add watermark as an inset axes
+            # This approach works correctly with bbox_inches='tight'
+            ax_watermark = fig.add_axes([x, y, watermark_width, watermark_height],
+                                       zorder=1000)
+            ax_watermark.imshow(img_array, aspect='auto')
+            ax_watermark.axis('off')
+
+        except Exception as e:
+            # Print error for debugging but don't crash
+            import traceback
+            print(f"Warning: Image watermark failed: {e}")
+            traceback.print_exc()
+            # Don't fall back to text - just skip the watermark if it fails
+
+    def _get_watermark_position(self, config: "WatermarkConfig") -> tuple[float, float, str, str]:
+        """
+        Get the position for a watermark in figure coordinates.
+
+        Args:
+            config: The WatermarkConfig object.
+
+        Returns:
+            Tuple of (x, y, horizontal_alignment, vertical_alignment) in figure coordinates (0-1).
+        """
+        margin_x = config.margin[0]
+        margin_y = config.margin[1]
+
+        if config.position == "top-left":
+            x, y = margin_x, 1 - margin_y
+            ha, va = "left", "top"
+        elif config.position == "top-right":
+            x, y = 1 - margin_x, 1 - margin_y
+            ha, va = "right", "top"
+        elif config.position == "bottom-left":
+            x, y = margin_x, margin_y
+            ha, va = "left", "bottom"
+        elif config.position == "bottom-right":
+            x, y = 1 - margin_x, margin_y
+            ha, va = "right", "bottom"
+        elif config.position == "center":
+            x, y = 0.5, 0.5
+            ha, va = "center", "center"
+        else:
+            x, y = 1 - margin_x, margin_y
+            ha, va = "right", "bottom"
+
+        return (x, y, ha, va)
 
     def _save_original_settings(self) -> None:
         """Save the original Seaborn settings."""
@@ -291,7 +370,7 @@ class SeabornAdapter(BaseAdapter):
         """
         # Set theme based on mode
         style = "whitegrid" if preset.mode == "article" else "darkgrid"
-        
+
         # Set context based on mode
         context = "paper" if preset.mode == "article" else "talk"
 
@@ -305,12 +384,12 @@ class SeabornAdapter(BaseAdapter):
             "lines.linewidth": preset.line_width,
             "font.family": preset.font_family,
         }
-        
+
         # Handle custom font families specifically for Seaborn/Matplotlib
         if preset.mode == "latex":
-             style_params["font.family"] = "serif"
-             style_params["mathtext.fontset"] = "cm"
-             style_params["font.serif"] = ["cmr10", "Computer Modern Serif", "DejaVu Serif"]
+            style_params["font.family"] = "serif"
+            style_params["mathtext.fontset"] = "cm"
+            style_params["font.serif"] = ["cmr10", "Computer Modern Serif", "DejaVu Serif"]
 
         # Apply settings in a single call to avoid resetting
         self._seaborn.set_theme(style=style, context=context, rc=style_params)
@@ -343,3 +422,64 @@ class SeabornAdapter(BaseAdapter):
         """Handle Seaborn 0.9+ specific settings."""
         # Seaborn 0.9+ has improved color palette handling
         pass
+
+    def apply_title_config(self, config: "TitleConfig") -> None:
+        """
+        Apply title alignment configuration to Seaborn.
+
+        Args:
+            config: The TitleConfig object containing title alignment settings.
+        """
+        if not self.is_available():
+            return
+
+        alignment_map = {
+            "left": "left",
+            "center": "center",
+            "right": "right",
+        }
+        ha = alignment_map.get(config.alignment, "center")
+
+        import matplotlib as mpl
+
+        mpl.rcParams["axes.titlealignment"] = ha
+
+    def apply_legend_config(self, config: "LegendConfig") -> None:
+        """
+        Apply legend position configuration to Seaborn.
+
+        Args:
+            config: The LegendConfig object containing legend position settings.
+        """
+        if not self.is_available():
+            return
+
+        import matplotlib as mpl
+
+        position_map = {
+            "inside_upper_right": "upper right",
+            "inside_upper_left": "upper left",
+            "inside_lower_right": "lower right",
+            "inside_lower_left": "lower left",
+            "inside_center": "center",
+        }
+
+        loc = position_map.get(config.position, "upper right")
+        mpl.rcParams["legend.loc"] = loc
+        mpl.rcParams["legend.framealpha"] = 0.9
+        mpl.rcParams["legend.edgecolor"] = "inherit"
+
+    def apply_axis_title_spacing(self, config: "AxisTitleSpacingConfig") -> None:
+        """
+        Apply axis title spacing configuration to Seaborn.
+
+        Args:
+            config: The AxisTitleSpacingConfig object containing spacing settings.
+        """
+        if not self.is_available():
+            return
+
+        import matplotlib as mpl
+
+        spacing = config.y_spacing * config.matplotlib_multiplier
+        mpl.rcParams["axes.titlepad"] = spacing

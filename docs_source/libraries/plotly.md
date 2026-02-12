@@ -27,7 +27,7 @@ fig = px.line(x=x, y=y, title='Sine Wave')
 fig.write_image('figure.png', scale=2)
 ```
 
-![Basic Plotly Example](../images/plotly_basic.png)
+![Basic Plotly Example](../assets/images/plotly_basic.png)
 
 ## Line Plots
 
@@ -48,7 +48,7 @@ fig.update_layout(showlegend=True)
 fig.write_image('plotly_line.png', scale=2)
 ```
 
-![Plotly Line Plot](../images/plotly_line.png)
+![Plotly Line Plot](../assets/images/plotly_line.png)
 
 ### Multiple Lines
 
@@ -75,7 +75,7 @@ fig.update_layout(showlegend=True)
 fig.write_image('plotly_multiple_lines.png', scale=2)
 ```
 
-![Plotly Multiple Lines](../images/plotly_multiple_lines.png)
+![Plotly Multiple Lines](../assets/images/plotly_multiple_lines.png)
 
 ## Scatter Plots
 
@@ -99,7 +99,7 @@ fig.update_layout(showlegend=True)
 fig.write_image('plotly_scatter.png', scale=2)
 ```
 
-![Plotly Scatter Plot](../images/plotly_scatter.png)
+![Plotly Scatter Plot](../assets/images/plotly_scatter.png)
 
 ## Bar Charts
 
@@ -119,7 +119,7 @@ fig.update_layout(showlegend=False)
 fig.write_image('plotly_bar.png', scale=2)
 ```
 
-![Plotly Bar Chart](../images/plotly_bar.png)
+![Plotly Bar Chart](../assets/images/plotly_bar.png)
 
 ## Histograms
 
@@ -139,7 +139,7 @@ fig.update_layout(showlegend=False)
 fig.write_image('plotly_histogram.png', scale=2)
 ```
 
-![Plotly Histogram](../images/plotly_histogram.png)
+![Plotly Histogram](../assets/images/plotly_histogram.png)
 
 ## Box Plots
 
@@ -163,7 +163,7 @@ fig.update_layout(showlegend=False)
 fig.write_image('plotly_box.png', scale=2, width=800, height=500)
 ```
 
-![Plotly Box Plot](../images/plotly_box.png)
+![Plotly Box Plot](../assets/images/plotly_box.png)
 
 ## Violin Plots
 
@@ -187,7 +187,7 @@ fig.update_layout(showlegend=False)
 fig.write_image('plotly_violin.png', scale=2, width=800, height=500)
 ```
 
-![Plotly Violin Plot](../images/plotly_violin.png)
+![Plotly Violin Plot](../assets/images/plotly_violin.png)
 
 ## Subplots
 
@@ -218,7 +218,7 @@ fig.update_layout(showlegend=True, width=1200, height=500)
 fig.write_image('plotly_subplots.png', scale=2)
 ```
 
-![Plotly Subplots](../images/plotly_subplots.png)
+![Plotly Subplots](../assets/images/plotly_subplots.png)
 
 ## Using Colorways
 
@@ -245,7 +245,7 @@ fig.update_layout(showlegend=True)
 fig.write_image('plotly_colorway.png', scale=2, width=800, height=500)
 ```
 
-![Plotly Colorway](../images/plotly_colorway.png)
+![Plotly Colorway](../assets/images/plotly_colorway.png)
 
 ## Using Watermarks
 
@@ -264,7 +264,7 @@ fig.update_layout(showlegend=True)
 fig.write_image('plotly_watermark.png', scale=2, width=800, height=500)
 ```
 
-![Plotly Watermark](../images/plotly_watermark.png)
+![Plotly Watermark](../assets/images/plotly_watermark.png)
 
 ## Per-Library Setup
 

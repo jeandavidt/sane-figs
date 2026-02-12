@@ -189,5 +189,5 @@ plt.ylabel('sin(x)')
 plt.savefig('figure.png')
 ```
 
-![Nature Journal Preset Example](images/presets_example.png)
+![Nature Journal Preset Example](assets/images/presets_example.png)
 

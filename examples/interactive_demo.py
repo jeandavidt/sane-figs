@@ -1,6 +1,20 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "altair==6.0.0",
+#     "marimo>=0.19.10",
+#     "matplotlib==3.10.8",
+#     "numpy==2.4.2",
+#     "pandas==3.0.0",
+#     "plotly==6.5.2",
+#     "sane-figs==0.1.0",
+#     "seaborn==0.13.2",
+# ]
+# ///
+
 import marimo
 
-__generated_with = "0.19.9"
+__generated_with = "0.19.10"
 app = marimo.App(width="medium")
 
 
@@ -34,7 +48,7 @@ def _():
     import pandas as pd
     import numpy as np
 
-    return alt, mo, np, pd, px, sane_figs, sns, plt
+    return alt, mo, np, pd, plt, px, sane_figs, sns
 
 
 @app.cell
@@ -176,9 +190,15 @@ def _(
     # Display - for Altair, return directly without centering to avoid squeezing
     # For other libraries, center the output
     if selected_lib == "Altair":
-        final_plot
+        _out=final_plot
     else:
-        mo.center(final_plot)
+        _out=mo.center(final_plot)
+    _out
+    return
+
+
+@app.cell
+def _():
     return
 
 

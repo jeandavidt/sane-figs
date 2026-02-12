@@ -16,6 +16,11 @@ from sane_figs.styling.watermarks import (
     create_image_watermark,
     create_text_watermark,
 )
+from sane_figs.styling.layout import (
+    TitleConfig,
+    LegendConfig,
+    AxisTitleSpacingConfig,
+)
 
 __all__ = [
     "Colorway",
@@ -30,4 +35,7 @@ __all__ = [
     "WatermarkConfig",
     "create_text_watermark",
     "create_image_watermark",
+    "TitleConfig",
+    "LegendConfig",
+    "AxisTitleSpacingConfig",
 ]
