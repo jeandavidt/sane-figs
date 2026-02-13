@@ -96,6 +96,10 @@ class MatplotlibAdapter(BaseAdapter):
         if preset.colorway is not None:
             self.apply_colorway(preset.colorway)
 
+        # Apply legend config if specified
+        if preset.legend_config is not None:
+            self.apply_legend_config(preset.legend_config)
+
         # Apply watermark if specified
         if preset.watermark is not None:
             self.add_watermark(preset.watermark)
@@ -438,19 +442,28 @@ class MatplotlibAdapter(BaseAdapter):
         if not self.is_available():
             return
 
+        # (loc, bbox_to_anchor) — None bbox means use default axes coordinates
         position_map = {
-            "inside_upper_right": "upper right",
-            "inside_upper_left": "upper left",
-            "inside_lower_right": "lower right",
-            "inside_lower_left": "lower left",
-            "inside_center": "center",
+            "inside_upper_right": ("upper right", None),
+            "inside_upper_left": ("upper left", None),
+            "inside_lower_right": ("lower right", None),
+            "inside_lower_left": ("lower left", None),
+            "inside_center": ("center", None),
+            # Outside positions require bbox_to_anchor to place legend outside axes.
+            # Note: savefig(..., bbox_inches='tight') prevents clipping.
+            "outside_right": ("center left", (1.0, 0.5)),
+            "outside_left": ("center right", (0.0, 0.5)),
+            "outside_top": ("lower center", (0.5, 1.0)),
+            "outside_bottom": ("upper center", (0.5, -0.02)),
         }
 
-        loc = position_map.get(config.position, "upper right")
+        loc, bbox = position_map.get(config.position, ("upper right", None))
 
         self._matplotlib.rcParams["legend.loc"] = loc
         self._matplotlib.rcParams["legend.framealpha"] = 0.9
         self._matplotlib.rcParams["legend.edgecolor"] = "inherit"
+
+        # bbox_to_anchor is not a valid rcParam; it must be set per-legend
 
         if config.alignment == "start":
             self._matplotlib.rcParams["legend.labelspacing"] = 0.5

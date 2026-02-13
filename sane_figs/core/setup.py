@@ -16,6 +16,7 @@ def apply_global_setup(
     libraries: list[str] | None = None,
     colorway: Union[str, "Colorway", None] = None,
     watermark: Union[str, "WatermarkConfig", None] = None,
+    legend_config=None,
     discovery_service: Union["DiscoveryService", None] = None,
     style_registry: Union["StyleRegistry", None] = None,
 ) -> None:
@@ -29,6 +30,7 @@ def apply_global_setup(
         colorway: Colorway name or Colorway object to use. If None, uses the
             default colorway for the mode.
         watermark: Watermark text, WatermarkConfig object, or None.
+        legend_config: LegendConfig to override the preset's legend positioning.
         discovery_service: DiscoveryService instance for detecting libraries.
         style_registry: StyleRegistry instance for tracking styles.
     """
@@ -66,6 +68,10 @@ def apply_global_setup(
         else:
             preset_watermark = watermark
         preset.watermark = preset_watermark
+
+    # Override legend config if provided
+    if legend_config is not None:
+        preset.legend_config = legend_config
 
     # Get available adapters
     if libraries is None:
@@ -132,6 +138,7 @@ class PublicationStyleContext:
         libraries: list[str] | None = None,
         colorway: Union[str, "Colorway", None] = None,
         watermark: Union[str, "WatermarkConfig", None] = None,
+        legend_config=None,
         discovery_service: Union["DiscoveryService", None] = None,
         style_registry: Union["StyleRegistry", None] = None,
     ) -> None:
@@ -143,6 +150,7 @@ class PublicationStyleContext:
             libraries: List of library names to apply styling to.
             colorway: Colorway name or Colorway object to use.
             watermark: Watermark text, WatermarkConfig object, or None.
+            legend_config: LegendConfig to override preset legend positioning.
             discovery_service: DiscoveryService instance.
             style_registry: StyleRegistry instance.
         """
@@ -150,6 +158,7 @@ class PublicationStyleContext:
         self.libraries = libraries
         self.colorway = colorway
         self.watermark = watermark
+        self.legend_config = legend_config
         self.discovery_service = discovery_service
         self.style_registry = style_registry
         self._active_libraries: list[str] = []
@@ -216,6 +225,10 @@ class PublicationStyleContext:
                 else:
                     preset_watermark = self.watermark
                 preset.watermark = preset_watermark
+
+            # Override legend config if provided
+            if self.legend_config is not None:
+                preset.legend_config = self.legend_config
 
             # Apply the preset
             adapter.apply_style(preset)

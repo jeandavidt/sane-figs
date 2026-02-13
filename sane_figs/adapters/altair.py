@@ -435,9 +435,9 @@ class AltairAdapter(BaseAdapter):
             dpi_scale = preset.dpi / 72.0
 
             # For Altair charts (which are displayed primarily on screens),
-            # use a screen-appropriate DPI (96-100) instead of print DPI
-            # to calculate pixel dimensions, while keeping the aspect ratio
-            screen_dpi = 100
+            # use screen_dpi for pixel dimensions rather than print DPI.
+            # Fonts still scale with print dpi to maintain physical size intent.
+            screen_dpi = preset.get_display_dpi()
 
             # Create the base theme config
             base_theme_config = {
@@ -586,24 +586,31 @@ class AltairAdapter(BaseAdapter):
 
         try:
             position_map = {
-                "inside_upper_right": {"orient": "upper-left", "x": 1.0, "y": 1.0},
-                "inside_upper_left": {"orient": "upper-right", "x": 0.0, "y": 1.0},
-                "inside_lower_right": {"orient": "upper-left", "x": 1.0, "y": 0.0},
-                "inside_lower_left": {"orient": "upper-right", "x": 0.0, "y": 0.0},
+                "inside_upper_right": {"orient": "top-right"},
+                "inside_upper_left": {"orient": "top-left"},
+                "inside_lower_right": {"orient": "bottom-right"},
+                "inside_lower_left": {"orient": "bottom-left"},
                 "inside_center": {"orient": "none", "x": 0.5, "y": 0.5},
-                "outside_right": {"orient": "vertical", "x": 1.0, "y": 0.5},
-                "outside_left": {"orient": "vertical", "x": 0.0, "y": 0.5},
-                "outside_top": {"orient": "horizontal", "x": 0.5, "y": 1.0},
-                "outside_bottom": {"orient": "horizontal", "x": 0.5, "y": 0.0},
+                "outside_right": {"orient": "right"},
+                "outside_left": {"orient": "left"},
+                "outside_top": {"orient": "top"},
+                "outside_bottom": {"orient": "bottom"},
             }
 
             pos = position_map.get(config.position, position_map["inside_upper_right"])
 
             if self._base_theme_config is not None:
                 legend_config = self._base_theme_config["config"]["legend"]
+                # Remove old position keys before applying new ones
+                for key in ("orient", "x", "y"):
+                    legend_config.pop(key, None)
                 legend_config.update(pos)
-                legend_config["x"] = legend_config.get("x", 0) + config.x_offset
-                legend_config["y"] = legend_config.get("y", 0) + config.y_offset
+                # Apply offsets only when x/y are set (orient-based positions
+                # don't use explicit coordinates, so offsets are not applied)
+                if config.x_offset != 0 and "x" in legend_config:
+                    legend_config["x"] = legend_config["x"] + config.x_offset
+                if config.y_offset != 0 and "y" in legend_config:
+                    legend_config["y"] = legend_config["y"] + config.y_offset
                 self._update_altair_theme()
         except Exception:
             pass

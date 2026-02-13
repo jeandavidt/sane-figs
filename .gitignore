@@ -135,6 +135,7 @@ docs/.nojekyll
 
 # MkDocs generated assets
 docs_source/assets/
+docs_source/images/
 docs_source/*.html
 
 # Marimo export artifacts

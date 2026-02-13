@@ -352,11 +352,11 @@ class PlotlyAdapter(BaseAdapter):
             import plotly.graph_objects as go
             import plotly.io as pio
 
-            # Calculate DPI scale factor
-            # Plotly uses pixels for font sizes, but presets use points
-            # To match Matplotlib's physical size at the given DPI:
-            # size_px = size_pt * (dpi / 72.0)
-            dpi_scale = preset.dpi / 72.0
+            # For HTML/browser output Plotly uses CSS pixels, not print inches.
+            # Scale figure_size (inches) by 150 px/in for a screen-friendly size.
+            # Scale font sizes from points using 96/72 (1 pt → CSS px).
+            screen_px_per_inch = 150
+            dpi_scale = 96 / 72.0  # 1 pt → CSS px at standard screen resolution
 
             # Grid and Spines settings (mimic Matplotlib)
             grid_color = "rgba(0,0,0,0.1)"  # Light gray with transparency
@@ -364,9 +364,9 @@ class PlotlyAdapter(BaseAdapter):
 
             # Create layout dictionary
             layout_dict = dict(
-                # Figure settings
-                width=int(preset.figure_size[0] * preset.dpi),
-                height=int(preset.figure_size[1] * preset.dpi),
+                # Fixed screen-friendly pixel dimensions
+                width=int(preset.figure_size[0] * screen_px_per_inch),
+                height=int(preset.figure_size[1] * screen_px_per_inch),
                 font=dict(
                     family=preset.font_family,
                     size=preset.font_size.get("label", 12) * dpi_scale,
@@ -509,11 +509,11 @@ class PlotlyAdapter(BaseAdapter):
             import plotly.io as pio
 
             position_map = {
-                "inside_upper_right": {"x": 1.02, "xanchor": "left", "y": 1.0, "yanchor": "bottom"},
-                "inside_upper_left": {"x": 0.02, "xanchor": "left", "y": 1.0, "yanchor": "bottom"},
+                "inside_upper_right": {"x": 0.98, "xanchor": "right", "y": 0.98, "yanchor": "top"},
+                "inside_upper_left": {"x": 0.02, "xanchor": "left", "y": 0.98, "yanchor": "top"},
                 "inside_lower_right": {
-                    "x": 1.02,
-                    "xanchor": "left",
+                    "x": 0.98,
+                    "xanchor": "right",
                     "y": 0.02,
                     "yanchor": "bottom",
                 },

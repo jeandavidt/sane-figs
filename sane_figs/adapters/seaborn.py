@@ -456,18 +456,27 @@ class SeabornAdapter(BaseAdapter):
 
         import matplotlib as mpl
 
+        # (loc, bbox_to_anchor) — None bbox means use default axes coordinates
         position_map = {
-            "inside_upper_right": "upper right",
-            "inside_upper_left": "upper left",
-            "inside_lower_right": "lower right",
-            "inside_lower_left": "lower left",
-            "inside_center": "center",
+            "inside_upper_right": ("upper right", None),
+            "inside_upper_left": ("upper left", None),
+            "inside_lower_right": ("lower right", None),
+            "inside_lower_left": ("lower left", None),
+            "inside_center": ("center", None),
+            # Outside positions require bbox_to_anchor to place legend outside axes.
+            # Note: savefig(..., bbox_inches='tight') prevents clipping.
+            "outside_right": ("center left", (1.0, 0.5)),
+            "outside_left": ("center right", (0.0, 0.5)),
+            "outside_top": ("lower center", (0.5, 1.0)),
+            "outside_bottom": ("upper center", (0.5, -0.02)),
         }
 
-        loc = position_map.get(config.position, "upper right")
+        loc, bbox = position_map.get(config.position, ("upper right", None))
         mpl.rcParams["legend.loc"] = loc
         mpl.rcParams["legend.framealpha"] = 0.9
         mpl.rcParams["legend.edgecolor"] = "inherit"
+
+        # bbox_to_anchor is not a valid rcParam; it must be set per-legend
 
     def apply_axis_title_spacing(self, config: "AxisTitleSpacingConfig") -> None:
         """

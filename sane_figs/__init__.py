@@ -51,6 +51,7 @@ def setup(
     libraries: list[str] | None = None,
     colorway: str | Colorway | None = None,
     watermark: str | WatermarkConfig | None = None,
+    legend_config=None,
 ) -> None:
     """
     Apply publication-ready styling globally to all specified libraries.
@@ -62,6 +63,8 @@ def setup(
         colorway: Colorway name or Colorway object to use. If None, uses the
             default colorway for the mode.
         watermark: Watermark text, WatermarkConfig object, or None.
+        legend_config: LegendConfig object to override the preset's legend
+            positioning. If None, the preset's legend_config is used.
 
     Example:
         >>> import sane_figs
@@ -75,6 +78,7 @@ def setup(
         libraries=libraries,
         colorway=colorway,
         watermark=watermark,
+        legend_config=legend_config,
         discovery_service=_discovery_service,
         style_registry=_style_registry,
     )
@@ -107,6 +111,7 @@ def publication_style(
     libraries: list[str] | None = None,
     colorway: str | Colorway | None = None,
     watermark: str | WatermarkConfig | None = None,
+    legend_config=None,
 ):
     """
     Context manager for applying publication-ready styling to a block of code.
@@ -133,6 +138,7 @@ def publication_style(
         libraries=libraries,
         colorway=colorway,
         watermark=watermark,
+        legend_config=legend_config,
         discovery_service=_discovery_service,
         style_registry=_style_registry,
     )
@@ -460,6 +466,7 @@ def setup_matplotlib(
     mode: str = "article",
     colorway: str | Colorway | None = None,
     watermark: str | WatermarkConfig | None = None,
+    legend_config=None,
 ) -> None:
     """
     Apply publication-ready styling to Matplotlib.
@@ -468,14 +475,16 @@ def setup_matplotlib(
         mode: The preset mode to use ('article' or 'presentation').
         colorway: Colorway name or Colorway object to use.
         watermark: Watermark text, WatermarkConfig object, or None.
+        legend_config: LegendConfig to override preset legend positioning.
     """
-    setup(mode=mode, libraries=["matplotlib"], colorway=colorway, watermark=watermark)
+    setup(mode=mode, libraries=["matplotlib"], colorway=colorway, watermark=watermark, legend_config=legend_config)
 
 
 def setup_seaborn(
     mode: str = "article",
     colorway: str | Colorway | None = None,
     watermark: str | WatermarkConfig | None = None,
+    legend_config=None,
 ) -> None:
     """
     Apply publication-ready styling to Seaborn.
@@ -484,14 +493,16 @@ def setup_seaborn(
         mode: The preset mode to use ('article' or 'presentation').
         colorway: Colorway name or Colorway object to use.
         watermark: Watermark text, WatermarkConfig object, or None.
+        legend_config: LegendConfig to override preset legend positioning.
     """
-    setup(mode=mode, libraries=["seaborn"], colorway=colorway, watermark=watermark)
+    setup(mode=mode, libraries=["seaborn"], colorway=colorway, watermark=watermark, legend_config=legend_config)
 
 
 def setup_plotly(
     mode: str = "article",
     colorway: str | Colorway | None = None,
     watermark: str | WatermarkConfig | None = None,
+    legend_config=None,
 ) -> None:
     """
     Apply publication-ready styling to Plotly.
@@ -500,14 +511,16 @@ def setup_plotly(
         mode: The preset mode to use ('article' or 'presentation').
         colorway: Colorway name or Colorway object to use.
         watermark: Watermark text, WatermarkConfig object, or None.
+        legend_config: LegendConfig to override preset legend positioning.
     """
-    setup(mode=mode, libraries=["plotly"], colorway=colorway, watermark=watermark)
+    setup(mode=mode, libraries=["plotly"], colorway=colorway, watermark=watermark, legend_config=legend_config)
 
 
 def setup_altair(
     mode: str = "article",
     colorway: str | Colorway | None = None,
     watermark: str | WatermarkConfig | None = None,
+    legend_config=None,
 ) -> None:
     """
     Apply publication-ready styling to Altair.
@@ -516,8 +529,9 @@ def setup_altair(
         mode: The preset mode to use ('article' or 'presentation').
         colorway: Colorway name or Colorway object to use.
         watermark: Watermark text, WatermarkConfig object, or None.
+        legend_config: LegendConfig to override preset legend positioning.
     """
-    setup(mode=mode, libraries=["altair"], colorway=colorway, watermark=watermark)
+    setup(mode=mode, libraries=["altair"], colorway=colorway, watermark=watermark, legend_config=legend_config)
 
 
 __all__ = [

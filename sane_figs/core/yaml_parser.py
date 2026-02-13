@@ -203,6 +203,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
     if len(figure_size) != 2:
         raise YAMLParseError("'figure.size' must be a list of two numbers")
     dpi = figure_data.get("dpi", 300)
+    screen_dpi = figure_data.get("screen_dpi", None)
 
     # Parse typography settings
     typography_data = data.get("typography", {})
@@ -285,6 +286,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
         mode=data["mode"],
         figure_size=figure_size,
         dpi=dpi,
+        screen_dpi=screen_dpi,
         font_family=font_family,
         font_size=font_sizes,
         line_width=line_width,

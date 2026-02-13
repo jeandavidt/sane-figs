@@ -50,11 +50,20 @@ class Preset:
     font_size: dict[str, float] = field(default_factory=dict)
     line_width: float = 1.5
     marker_size: float = 6.0
+    screen_dpi: int | None = None
     colorway: "Colorway | None" = None
     watermark: "WatermarkConfig | None" = None
     title_config: "TitleConfig | None" = None
     legend_config: "LegendConfig | None" = None
     axis_title_spacing: "AxisTitleSpacingConfig | None" = None
+
+    def get_display_dpi(self) -> int:
+        """DPI for HTML/screen rendering (Plotly, Altair).
+
+        Returns screen_dpi if set, otherwise defaults to 100 (standard screen DPI).
+        Print/image outputs should use the dpi field directly.
+        """
+        return self.screen_dpi if self.screen_dpi is not None else 100
 
 
 # Preset registry
@@ -206,6 +215,9 @@ def load_config() -> None:
             pass
 
 
+# Default legend configuration applied to all built-in presets
+_DEFAULT_LEGEND_CONFIG = LegendConfig(position="inside_upper_right")
+
 # Built-in presets
 # These are registered when the module is imported
 
@@ -217,6 +229,7 @@ _ARTICLE_PRESET = Preset(
     mode="article",
     figure_size=(3.5, 2.625),  # Standard single-column journal width, 4:3 aspect
     dpi=300,  # Print quality
+    screen_dpi=100,
     font_family="sans-serif",
     font_size={
         "title": 9.0,
@@ -229,6 +242,7 @@ _ARTICLE_PRESET = Preset(
     marker_size=4.0,
     colorway=None,  # Will be set to DEFAULT_COLORWAY
     watermark=None,
+    legend_config=_DEFAULT_LEGEND_CONFIG,
 )
 
 # Presentation Mode Preset
@@ -240,6 +254,7 @@ _PRESENTATION_PRESET = Preset(
     mode="presentation",
     figure_size=(10.0, 5.6),  # ~75% of 16:9 slide area (13.33"×7.5" full slide)
     dpi=150,  # Sufficient for screen/projector (~full HD output)
+    screen_dpi=150,
     font_family="sans-serif",
     font_size={
         "title": 24.0,
@@ -252,6 +267,7 @@ _PRESENTATION_PRESET = Preset(
     marker_size=9.0,
     colorway=None,  # Will be set to VIBRANT_COLORWAY
     watermark=None,
+    legend_config=_DEFAULT_LEGEND_CONFIG,
 )
 
 # ULaval Preset
@@ -261,6 +277,7 @@ _ULAVAL_PRESET = Preset(
     mode="ulaval",
     figure_size=(6.5, 4.0),
     dpi=300,
+    screen_dpi=100,
     font_family="Overpass",
     font_size={
         "title": 11.0,
@@ -273,6 +290,7 @@ _ULAVAL_PRESET = Preset(
     marker_size=6.0,
     colorway=ULAVAL_COLORWAY,
     watermark=None,
+    legend_config=_DEFAULT_LEGEND_CONFIG,
 )
 
 # ModelEAU Preset
@@ -282,6 +300,7 @@ _MODELEAU_PRESET = Preset(
     mode="modeleau",
     figure_size=(6.5, 4.0),
     dpi=300,
+    screen_dpi=100,
     font_family="sans-serif",  # Default to sans-serif, using brand colors
     font_size={
         "title": 11.0,
@@ -294,6 +313,7 @@ _MODELEAU_PRESET = Preset(
     marker_size=6.0,
     colorway=MODELEAU_COLORWAY,
     watermark=None,
+    legend_config=_DEFAULT_LEGEND_CONFIG,
 )
 
 # Marimo Preset
@@ -303,6 +323,7 @@ _MARIMO_PRESET = Preset(
     mode="marimo",
     figure_size=(6.5, 4.0),
     dpi=100,  # Screen resolution
+    screen_dpi=100,
     font_family="Inter, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif",
     font_size={
         "title": 14.0,
@@ -315,6 +336,7 @@ _MARIMO_PRESET = Preset(
     marker_size=8.0,
     colorway=MARIMO_COLORWAY,
     watermark=None,
+    legend_config=_DEFAULT_LEGEND_CONFIG,
 )
 
 # LaTeX Preset
@@ -324,6 +346,7 @@ _LATEX_PRESET = Preset(
     mode="latex",
     figure_size=(5.5, 3.5),  # Typical LaTeX document figure width
     dpi=300,
+    screen_dpi=100,
     font_family="serif",  # Matplotlib adapter will handle this as 'cm'
     font_size={
         "title": 11.0,
@@ -336,6 +359,7 @@ _LATEX_PRESET = Preset(
     marker_size=5.0,
     colorway=None,  # Default colorway suitable for LaTeX
     watermark=None,
+    legend_config=_DEFAULT_LEGEND_CONFIG,
 )
 
 # Register built-in presets
