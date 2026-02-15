@@ -7,7 +7,7 @@
 #     "numpy==2.4.2",
 #     "pandas==3.0.0",
 #     "plotly==6.5.2",
-#     "sane-figs==0.1.0",
+#     "sane-figs",
 #     "seaborn==0.13.2",
 # ]
 # ///

@@ -37,6 +37,13 @@ from sane_figs.styling.watermarks import (
     create_image_watermark,
     create_text_watermark,
 )
+from sane_figs.utils.dpi_utils import (
+    detect_screen_dpi,
+    get_screen_scale,
+    get_export_scale_factor,
+    get_export_dimensions,
+    get_screen_dimensions,
+)
 
 # Import main functions after they are defined
 from sane_figs.core.discovery import DiscoveryService
@@ -581,4 +588,10 @@ __all__ = [
     "setup_seaborn",
     "setup_plotly",
     "setup_altair",
+    # DPI utilities
+    "detect_screen_dpi",
+    "get_screen_scale",
+    "get_export_scale_factor",
+    "get_export_dimensions",
+    "get_screen_dimensions",
 ]
