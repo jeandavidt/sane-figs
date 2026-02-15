@@ -34,6 +34,7 @@ class AltairAdapter(BaseAdapter):
         self._current_theme = None
         self._base_theme_config = None  # Store the base theme config to avoid recursion
         self._watermark_config = None
+        self._current_colorway = None  # Store current colorway to persist through theme updates
 
     def _import_altair(self) -> bool:
         """
@@ -127,6 +128,8 @@ class AltairAdapter(BaseAdapter):
 
         # Clear stored state
         self._current_theme = None
+        self._base_theme_config = None
+        self._current_colorway = None
         self._watermark_config = None
 
     def apply_colorway(self, colorway: "Colorway") -> None:
@@ -140,24 +143,18 @@ class AltairAdapter(BaseAdapter):
             return
 
         try:
+            # Store the colorway so it persists through theme updates
+            self._current_colorway = colorway
+
             # Update the current theme with the colorway
             if self._base_theme_config is not None:
-                # Create a new theme that merges the base theme with the colorway
-                def merged_theme():
-                    # Use the base theme config to avoid recursion
-                    theme_config = self._base_theme_config.copy()
-                    # Add colorway to the theme
-                    theme_config["config"]["range"] = {
-                        "category": colorway.categorical,
-                        "diverging": colorway.diverging,
-                        "ordinal": colorway.qualitative,
-                    }
-                    return theme_config
-
-                # Re-register the updated theme
-                self._altair.themes.register("sane_figs", merged_theme)
-                self._altair.themes.enable("sane_figs")
-                self._current_theme = merged_theme
+                # Add colorway directly to base_theme_config so it persists
+                self._base_theme_config["config"]["range"] = {
+                    "category": colorway.categorical,
+                    "diverging": colorway.diverging,
+                    "ordinal": colorway.qualitative,
+                }
+                self._update_altair_theme()
             else:
                 # Fallback: create a new theme if base_theme_config doesn't exist
                 def colorway_theme():
@@ -645,8 +642,20 @@ class AltairAdapter(BaseAdapter):
             pass
 
     def _update_altair_theme(self) -> None:
-        """Update the Altair theme with the current base theme config."""
+        """Update the Altair theme with the current base theme config.
+
+        This method preserves the colorway range if one has been applied,
+        ensuring that subsequent theme updates (e.g., for legend config)
+        don't overwrite the colorway.
+        """
         try:
+            # Ensure colorway is preserved in the theme config
+            if self._current_colorway is not None and "range" not in self._base_theme_config["config"]:
+                self._base_theme_config["config"]["range"] = {
+                    "category": self._current_colorway.categorical,
+                    "diverging": self._current_colorway.diverging,
+                    "ordinal": self._current_colorway.qualitative,
+                }
 
             def updated_theme():
                 return self._base_theme_config

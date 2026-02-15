@@ -396,9 +396,17 @@ class MatplotlibAdapter(BaseAdapter):
         self._matplotlib.rcParams["axes.edgecolor"] = ps.axis_line_color
         self._matplotlib.rcParams["axes.linewidth"] = ps.axis_line_width
 
-        # Ticks
-        self._matplotlib.rcParams["xtick.direction"] = ps.tick_direction
-        self._matplotlib.rcParams["ytick.direction"] = ps.tick_direction
+        # Ticks - translate PlotStyle values to Matplotlib rcParams
+        # PlotStyle uses: "outside", "inside", "both"
+        # Matplotlib expects: "out", "in", "inout"
+        tick_direction_map = {
+            "outside": "out",
+            "inside": "in",
+            "both": "inout",
+        }
+        mpl_tick_direction = tick_direction_map.get(ps.tick_direction, "out")
+        self._matplotlib.rcParams["xtick.direction"] = mpl_tick_direction
+        self._matplotlib.rcParams["ytick.direction"] = mpl_tick_direction
         self._matplotlib.rcParams["xtick.major.size"] = ps.tick_length
         self._matplotlib.rcParams["ytick.major.size"] = ps.tick_length
         self._matplotlib.rcParams["xtick.color"] = ps.tick_color

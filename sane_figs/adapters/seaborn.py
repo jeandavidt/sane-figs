@@ -413,9 +413,15 @@ class SeabornAdapter(BaseAdapter):
             "axes.spines.right": ps.show_right_spine,
             "axes.edgecolor": ps.axis_line_color,
             "axes.linewidth": ps.axis_line_width,
-            # Ticks
-            "xtick.direction": ps.tick_direction,
-            "ytick.direction": ps.tick_direction,
+            # Ticks - translate PlotStyle values to Matplotlib rcParams
+            # PlotStyle uses: "outside", "inside", "both"
+            # Matplotlib expects: "out", "in", "inout"
+            "xtick.direction": {"outside": "out", "inside": "in", "both": "inout"}.get(
+                ps.tick_direction, "out"
+            ),
+            "ytick.direction": {"outside": "out", "inside": "in", "both": "inout"}.get(
+                ps.tick_direction, "out"
+            ),
             "xtick.major.size": ps.tick_length,
             "ytick.major.size": ps.tick_length,
             "xtick.color": ps.tick_color,
