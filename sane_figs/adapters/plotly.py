@@ -36,6 +36,7 @@ class PlotlyAdapter(BaseAdapter):
         self._original_figure_init = None
         self._original_write_image = None
         self._preset = None  # Store preset for export-time DPI calculations
+        self._template_dimensions = None  # Store (width, height) for figure patching
 
     def _import_plotly(self) -> bool:
         """
@@ -156,6 +157,7 @@ class PlotlyAdapter(BaseAdapter):
         self._current_template = None
         self._watermark_config = None
         self._preset = None
+        self._template_dimensions = None
 
     def apply_colorway(self, colorway: "Colorway") -> None:
         """
@@ -197,37 +199,9 @@ class PlotlyAdapter(BaseAdapter):
         if not self.is_available():
             return
 
-        # Store watermark config
+        # Store watermark config - the patching is handled by _patch_figure_init
+        # which is called from _configure_template
         self._watermark_config = config
-
-        # Patch the Figure class to add watermarks automatically
-        try:
-            import plotly.graph_objects as go
-
-            # Save original __init__ if not already saved
-            if self._original_figure_init is None:
-                self._original_figure_init = go.Figure.__init__
-
-            # Create a wrapper that adds watermark after initialization
-            adapter_self = self
-            original_init = self._original_figure_init
-
-            def figure_init_with_watermark(fig_self, *args, **kwargs):
-                """Initialize figure and add watermark."""
-                # Call original __init__
-                original_init(fig_self, *args, **kwargs)
-
-                # Add watermark to the figure
-                if adapter_self._watermark_config is not None:
-                    adapter_self._add_watermark_to_figure(fig_self, adapter_self._watermark_config)
-
-            # Patch Figure.__init__
-            go.Figure.__init__ = figure_init_with_watermark
-
-        except Exception as e:
-            print(f"Warning: Failed to patch Plotly Figure class: {e}")
-            import traceback
-            traceback.print_exc()
 
     def _add_watermark_to_figure(self, fig, config: "WatermarkConfig") -> None:
         """
@@ -430,9 +404,13 @@ class PlotlyAdapter(BaseAdapter):
             ]
 
             self._current_template = template
+            self._template_dimensions = (width_px, height_px)
 
             pio.templates["sane_figs"] = template
             pio.templates.default = "sane_figs"
+
+            # Patch Figure.__init__ to apply template dimensions
+            self._patch_figure_init()
         except Exception as e:
             print(f"Error configuring Plotly template: {e}")
             pass
@@ -474,6 +452,47 @@ class PlotlyAdapter(BaseAdapter):
                 return original_write_image(fig_self, *args, **kwargs)
 
             go.Figure.write_image = write_image_with_scaling
+
+        except Exception:
+            pass
+
+    def _patch_figure_init(self) -> None:
+        """Patch ``Figure.__init__`` to apply template dimensions.
+
+        Plotly templates can set width/height, but figures don't inherit these
+        values - they remain None and Plotly uses responsive sizing. This patch
+        ensures each figure gets the template's width/height applied.
+        """
+        try:
+            import plotly.graph_objects as go
+
+            if self._original_figure_init is not None:
+                return  # already patched
+
+            self._original_figure_init = go.Figure.__init__
+
+            adapter_self = self
+            original_init = self._original_figure_init
+
+            def figure_init_with_dimensions(fig_self, *args, **kwargs):
+                """Initialize figure and apply template dimensions."""
+                # Call original __init__
+                original_init(fig_self, *args, **kwargs)
+
+                # Apply template dimensions if not explicitly set
+                if adapter_self._template_dimensions is not None:
+                    width, height = adapter_self._template_dimensions
+                    # Only set if not already set by the user
+                    if fig_self.layout.width is None:
+                        fig_self.layout.width = width
+                    if fig_self.layout.height is None:
+                        fig_self.layout.height = height
+
+                # Add watermark to the figure if configured
+                if adapter_self._watermark_config is not None:
+                    adapter_self._add_watermark_to_figure(fig_self, adapter_self._watermark_config)
+
+            go.Figure.__init__ = figure_init_with_dimensions
 
         except Exception:
             pass
