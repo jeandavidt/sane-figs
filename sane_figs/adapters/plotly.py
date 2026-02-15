@@ -345,6 +345,9 @@ class PlotlyAdapter(BaseAdapter):
         """
         Configure Plotly template based on preset.
 
+        All visual chrome is read from ``preset.plot_style`` so every preset
+        renders identically.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
@@ -352,73 +355,61 @@ class PlotlyAdapter(BaseAdapter):
             import plotly.graph_objects as go
             import plotly.io as pio
 
-            # For HTML/browser output Plotly uses CSS pixels, not print inches.
-            # Scale figure_size (inches) by 150 px/in for a screen-friendly size.
-            # Scale font sizes from points using 96/72 (1 pt → CSS px).
+            ps = preset.plot_style
+
+            # For HTML/browser output Plotly uses CSS pixels.
             screen_px_per_inch = 150
             dpi_scale = 96 / 72.0  # 1 pt → CSS px at standard screen resolution
 
-            # Grid and Spines settings (mimic Matplotlib)
-            grid_color = "rgba(0,0,0,0.1)"  # Light gray with transparency
-            axis_line_color = "black"
+            # Build a Plotly-compatible grid colour string from plot_style.
+            # Plotly expects opacity baked into an rgba() value.
+            grid_color = self._to_rgba(ps.grid_color, ps.grid_opacity)
 
-            # Create layout dictionary
+            # Shared axis config driven by plot_style
+            def _axis_config():
+                return dict(
+                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
+                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
+                    # Grid
+                    showgrid=ps.grid_visible,
+                    gridcolor=grid_color,
+                    gridwidth=ps.grid_width * dpi_scale,
+                    # Spines
+                    showline=True,
+                    linecolor=ps.axis_line_color,
+                    linewidth=ps.axis_line_width * dpi_scale,
+                    mirror=False,
+                    # Ticks
+                    ticks=ps.tick_direction if ps.tick_direction != "both" else "inside",
+                    ticklen=ps.tick_length * dpi_scale,
+                    tickcolor=ps.tick_color,
+                    nticks=6,
+                )
+
             layout_dict = dict(
-                # Fixed screen-friendly pixel dimensions
                 width=int(preset.figure_size[0] * screen_px_per_inch),
                 height=int(preset.figure_size[1] * screen_px_per_inch),
+                paper_bgcolor=ps.background_color,
+                plot_bgcolor=ps.background_color,
                 font=dict(
                     family=preset.font_family,
                     size=preset.font_size.get("label", 12) * dpi_scale,
                 ),
-                # Title
                 title=dict(font=dict(size=preset.font_size.get("title", 14) * dpi_scale)),
-                # Axis labels and ticks
-                xaxis=dict(
-                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
-                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
-                    # Grid
-                    showgrid=True,
-                    gridcolor=grid_color,
-                    gridwidth=0.5 * dpi_scale,
-                    # Spines (Axis Lines)
-                    showline=True,
-                    linecolor=axis_line_color,
-                    linewidth=0.8 * dpi_scale,
-                    # Mirror (off)
-                    mirror=False,
-                    # Ticks
-                    ticks="outside",
-                    ticklen=4 * dpi_scale,
-                    tickcolor=axis_line_color,
-                    nticks=6,
+                xaxis=_axis_config(),
+                yaxis=_axis_config(),
+                legend=dict(
+                    font=dict(size=preset.font_size.get("legend", 10) * dpi_scale),
+                    bgcolor=ps.background_color,
+                    bordercolor=(
+                        ps.axis_line_color
+                        if ps.legend_edge_color == "inherit"
+                        else ps.legend_edge_color
+                    ),
                 ),
-                yaxis=dict(
-                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
-                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
-                    # Grid
-                    showgrid=True,
-                    gridcolor=grid_color,
-                    gridwidth=0.5 * dpi_scale,
-                    # Spines (Axis Lines)
-                    showline=True,
-                    linecolor=axis_line_color,
-                    linewidth=0.8 * dpi_scale,
-                    # Mirror (off)
-                    mirror=False,
-                    # Ticks
-                    ticks="outside",
-                    ticklen=4 * dpi_scale,
-                    tickcolor=axis_line_color,
-                    nticks=6,
-                ),
-                # Legend
-                legend=dict(font=dict(size=preset.font_size.get("legend", 10) * dpi_scale)),
-                # Colorway
                 colorway=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"],
             )
 
-            # Create the Template object with explicit layout
             template = go.layout.Template(layout=layout_dict)
 
             # Set trace defaults
@@ -429,15 +420,43 @@ class PlotlyAdapter(BaseAdapter):
                 )
             ]
 
-            # Store the template for later modification (e.g., colorway)
             self._current_template = template
 
-            # Register and apply template
             pio.templates["sane_figs"] = template
             pio.templates.default = "sane_figs"
         except Exception as e:
             print(f"Error configuring Plotly template: {e}")
             pass
+
+    @staticmethod
+    def _to_rgba(color: str, opacity: float) -> str:
+        """Convert a named or hex colour + opacity to a Plotly ``rgba()`` string."""
+        # Handle common named colours directly to avoid import overhead
+        named = {
+            "black": (0, 0, 0),
+            "white": (255, 255, 255),
+            "gray": (128, 128, 128),
+            "grey": (128, 128, 128),
+            "red": (255, 0, 0),
+            "green": (0, 128, 0),
+            "blue": (0, 0, 255),
+        }
+        low = color.lower().strip()
+        if low in named:
+            r, g, b = named[low]
+            return f"rgba({r},{g},{b},{opacity})"
+        if low.startswith("#") and len(low) in (4, 7):
+            if len(low) == 4:
+                r = int(low[1] * 2, 16)
+                g = int(low[2] * 2, 16)
+                b = int(low[3] * 2, 16)
+            else:
+                r = int(low[1:3], 16)
+                g = int(low[3:5], 16)
+                b = int(low[5:7], 16)
+            return f"rgba({r},{g},{b},{opacity})"
+        # Fallback: return as-is (e.g. already an rgba string)
+        return color
 
     def _handle_version_specifics(self) -> None:
         """Handle version-specific Plotly settings."""

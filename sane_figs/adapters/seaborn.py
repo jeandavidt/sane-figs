@@ -365,24 +365,64 @@ class SeabornAdapter(BaseAdapter):
         """
         Configure Seaborn theme and context based on preset.
 
+        The visual chrome (background, grid, spines, ticks) now comes from
+        ``preset.plot_style`` instead of Seaborn's built-in theme names, so
+        *every* preset renders with the same look.  We always start from the
+        ``white`` base theme (no coloured background, no heavy gridlines) and
+        then layer on only the grid/spine behaviour requested by the style.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
-        # Set theme based on mode
-        style = "whitegrid" if preset.mode == "article" else "darkgrid"
+        ps = preset.plot_style
 
-        # Set context based on mode
+        # Choose a Seaborn context that roughly matches the target audience.
+        # "paper" gives smaller base sizes (good for article); "talk" gives
+        # bigger ones (good for presentations).  The explicit rcParam overrides
+        # below ensure the final numbers come from the preset, not from the
+        # context's defaults.
         context = "paper" if preset.mode == "article" else "talk"
 
-        # Configure additional style parameters
+        # Always use "white" as base style so the grid/background is fully
+        # controlled by plot_style.  The previous mode-dependent choice of
+        # "whitegrid" vs "darkgrid" was the root cause of the inconsistent
+        # background colour between article and presentation presets.
+        style = "white"
+
+        # Build rcParams from preset + plot_style
         style_params = {
+            # Font sizing
             "axes.labelsize": preset.font_size.get("label", 12.0),
             "xtick.labelsize": preset.font_size.get("tick", 10.0),
             "ytick.labelsize": preset.font_size.get("tick", 10.0),
             "legend.fontsize": preset.font_size.get("legend", 10.0),
             "axes.titlesize": preset.font_size.get("title", 14.0),
+            "axes.titleweight": ps.title_weight,
             "lines.linewidth": preset.line_width,
             "font.family": preset.font_family,
+            # Background
+            "axes.facecolor": ps.background_color,
+            "figure.facecolor": ps.background_color,
+            # Grid
+            "axes.grid": ps.grid_visible,
+            "grid.alpha": ps.grid_opacity,
+            "grid.linewidth": ps.grid_width,
+            "grid.color": ps.grid_color,
+            # Spines
+            "axes.spines.top": ps.show_top_spine,
+            "axes.spines.right": ps.show_right_spine,
+            "axes.edgecolor": ps.axis_line_color,
+            "axes.linewidth": ps.axis_line_width,
+            # Ticks
+            "xtick.direction": ps.tick_direction,
+            "ytick.direction": ps.tick_direction,
+            "xtick.major.size": ps.tick_length,
+            "ytick.major.size": ps.tick_length,
+            "xtick.color": ps.tick_color,
+            "ytick.color": ps.tick_color,
+            # Legend
+            "legend.framealpha": ps.legend_frame_opacity,
+            "legend.edgecolor": ps.legend_edge_color,
         }
 
         # Handle custom font families specifically for Seaborn/Matplotlib
@@ -473,8 +513,7 @@ class SeabornAdapter(BaseAdapter):
 
         loc, bbox = position_map.get(config.position, ("upper right", None))
         mpl.rcParams["legend.loc"] = loc
-        mpl.rcParams["legend.framealpha"] = 0.9
-        mpl.rcParams["legend.edgecolor"] = "inherit"
+        # legend frame styling already set via plot_style in _configure_theme
 
         # bbox_to_anchor is not a valid rcParam; it must be set per-legend
 

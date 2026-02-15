@@ -31,6 +31,7 @@ from sane_figs.styling.colorways import (
     PASTEL_COLORWAY,
     COLORBLIND_SAFE_COLORWAY,
 )
+from sane_figs.styling.layout import PlotStyle
 from sane_figs.styling.watermarks import (
     WatermarkConfig,
     create_image_watermark,
@@ -541,6 +542,7 @@ __all__ = [
     "__license__",
     # Core classes
     "Preset",
+    "PlotStyle",
     "Colorway",
     "WatermarkConfig",
     # Presets

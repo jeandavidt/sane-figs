@@ -329,14 +329,24 @@ class MatplotlibAdapter(BaseAdapter):
         """
         Configure Matplotlib rcParams based on preset.
 
+        All visual "chrome" (grid, spines, background, ticks, legend frame)
+        is read from ``preset.plot_style`` so that every preset renders
+        identically regardless of mode.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
+        ps = preset.plot_style
+
         # Figure settings
         self._matplotlib.rcParams["figure.figsize"] = preset.figure_size
         self._matplotlib.rcParams["figure.dpi"] = preset.dpi
         self._matplotlib.rcParams["savefig.dpi"] = preset.dpi
         self._matplotlib.rcParams["savefig.bbox"] = "tight"
+
+        # Background
+        self._matplotlib.rcParams["axes.facecolor"] = ps.background_color
+        self._matplotlib.rcParams["figure.facecolor"] = ps.background_color
 
         # Font settings
         if preset.mode == "latex":
@@ -355,7 +365,7 @@ class MatplotlibAdapter(BaseAdapter):
 
         # Title
         self._matplotlib.rcParams["axes.titlesize"] = preset.font_size.get("title", 14.0)
-        self._matplotlib.rcParams["axes.titleweight"] = "bold"
+        self._matplotlib.rcParams["axes.titleweight"] = ps.title_weight
 
         # Axis labels
         self._matplotlib.rcParams["axes.labelsize"] = preset.font_size.get("label", 12.0)
@@ -367,21 +377,32 @@ class MatplotlibAdapter(BaseAdapter):
 
         # Legend
         self._matplotlib.rcParams["legend.fontsize"] = preset.font_size.get("legend", 10.0)
-        self._matplotlib.rcParams["legend.framealpha"] = 0.9
-        self._matplotlib.rcParams["legend.edgecolor"] = "inherit"
+        self._matplotlib.rcParams["legend.framealpha"] = ps.legend_frame_opacity
+        self._matplotlib.rcParams["legend.edgecolor"] = ps.legend_edge_color
 
         # Lines and markers
         self._matplotlib.rcParams["lines.linewidth"] = preset.line_width
         self._matplotlib.rcParams["lines.markersize"] = preset.marker_size
 
         # Grid
-        self._matplotlib.rcParams["axes.grid"] = True
-        self._matplotlib.rcParams["grid.alpha"] = 0.3
-        self._matplotlib.rcParams["grid.linewidth"] = 0.5
+        self._matplotlib.rcParams["axes.grid"] = ps.grid_visible
+        self._matplotlib.rcParams["grid.alpha"] = ps.grid_opacity
+        self._matplotlib.rcParams["grid.linewidth"] = ps.grid_width
+        self._matplotlib.rcParams["grid.color"] = ps.grid_color
 
         # Spines
-        self._matplotlib.rcParams["axes.spines.top"] = False
-        self._matplotlib.rcParams["axes.spines.right"] = False
+        self._matplotlib.rcParams["axes.spines.top"] = ps.show_top_spine
+        self._matplotlib.rcParams["axes.spines.right"] = ps.show_right_spine
+        self._matplotlib.rcParams["axes.edgecolor"] = ps.axis_line_color
+        self._matplotlib.rcParams["axes.linewidth"] = ps.axis_line_width
+
+        # Ticks
+        self._matplotlib.rcParams["xtick.direction"] = ps.tick_direction
+        self._matplotlib.rcParams["ytick.direction"] = ps.tick_direction
+        self._matplotlib.rcParams["xtick.major.size"] = ps.tick_length
+        self._matplotlib.rcParams["ytick.major.size"] = ps.tick_length
+        self._matplotlib.rcParams["xtick.color"] = ps.tick_color
+        self._matplotlib.rcParams["ytick.color"] = ps.tick_color
 
         # Use LaTeX for text rendering if available (only if explicitly requested via separate config,
         # but here we are using 'latex' mode to simulate it without tex)
@@ -460,8 +481,7 @@ class MatplotlibAdapter(BaseAdapter):
         loc, bbox = position_map.get(config.position, ("upper right", None))
 
         self._matplotlib.rcParams["legend.loc"] = loc
-        self._matplotlib.rcParams["legend.framealpha"] = 0.9
-        self._matplotlib.rcParams["legend.edgecolor"] = "inherit"
+        # legend frame styling already set via plot_style in _configure_rcparams
 
         # bbox_to_anchor is not a valid rcParam; it must be set per-legend
 

@@ -425,35 +425,36 @@ class AltairAdapter(BaseAdapter):
         """
         Configure Altair theme based on preset.
 
+        All visual chrome (grid, spines, background, ticks) is read from
+        ``preset.plot_style`` so that every preset renders identically.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
         try:
+            ps = preset.plot_style
+
             # Convert point sizes to pixels for Altair
-            # Altair uses pixels for font sizes, while preset uses points
-            # Conversion: pixels = points * (DPI / 72)
             dpi_scale = preset.dpi / 72.0
 
-            # For Altair charts (which are displayed primarily on screens),
-            # use screen_dpi for pixel dimensions rather than print DPI.
-            # Fonts still scale with print dpi to maintain physical size intent.
+            # For screen display use screen_dpi for pixel dimensions
             screen_dpi = preset.get_display_dpi()
 
             # Create the base theme config
             base_theme_config = {
                 "config": {
+                    "background": ps.background_color,
                     "view": {
                         "width": int(preset.figure_size[0] * screen_dpi),
                         "height": int(preset.figure_size[1] * screen_dpi),
-                        # Remove border around the chart (matches spines.top/right=False)
                         "stroke": "transparent",
                     },
                     "font": preset.font_family,
                     "title": {
                         "font": preset.font_family,
                         "fontSize": preset.font_size.get("title", 14) * dpi_scale,
-                        "fontWeight": "bold",
-                        "anchor": "start",  # Match Matplotlib's left-aligned title
+                        "fontWeight": ps.title_weight,
+                        "anchor": "start",
                         "offset": 10,
                     },
                     "axis": {
@@ -461,26 +462,30 @@ class AltairAdapter(BaseAdapter):
                         "labelFont": preset.font_family,
                         "titleFontSize": preset.font_size.get("label", 12) * dpi_scale,
                         "labelFontSize": preset.font_size.get("tick", 10) * dpi_scale,
-                        # Grid settings (matches axes.grid=True)
-                        "grid": True,
-                        "gridOpacity": 0.3,
-                        "gridWidth": 0.5 * dpi_scale,
-                        "gridColor": "black",
-                        # Tick settings
-                        "tickCount": 5,  # Heuristic for sparse ticks
+                        # Grid
+                        "grid": ps.grid_visible,
+                        "gridOpacity": ps.grid_opacity,
+                        "gridWidth": ps.grid_width * dpi_scale,
+                        "gridColor": ps.grid_color,
+                        # Ticks
+                        "tickCount": 5,
                         "ticks": True,
                         "tickWidth": 0.5 * dpi_scale,
-                        "tickSize": 4 * dpi_scale,
-                        # Axis Line settings (spines)
-                        "domain": True,  # Show axis line
-                        "domainColor": "black",
-                        "domainWidth": 0.8 * dpi_scale,
+                        "tickSize": ps.tick_length * dpi_scale,
+                        "tickColor": ps.tick_color,
+                        # Spines / domain
+                        "domain": True,
+                        "domainColor": ps.axis_line_color,
+                        "domainWidth": ps.axis_line_width * dpi_scale,
                     },
                     "legend": {
                         "titleFont": preset.font_family,
                         "labelFont": preset.font_family,
                         "titleFontSize": preset.font_size.get("legend", 10) * dpi_scale,
                         "labelFontSize": preset.font_size.get("legend", 10) * dpi_scale,
+                        "fillColor": ps.background_color,
+                        "strokeColor": ps.legend_edge_color if ps.legend_edge_color != "inherit" else ps.axis_line_color,
+                        "opacity": ps.legend_frame_opacity,
                     },
                     "header": {
                         "titleFont": preset.font_family,
