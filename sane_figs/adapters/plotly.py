@@ -34,6 +34,8 @@ class PlotlyAdapter(BaseAdapter):
         self._current_template = None
         self._watermark_config = None
         self._original_figure_init = None
+        self._original_write_image = None
+        self._preset = None  # Store preset for export-time DPI calculations
 
     def _import_plotly(self) -> bool:
         """
@@ -99,6 +101,9 @@ class PlotlyAdapter(BaseAdapter):
         if preset.watermark is not None:
             self.add_watermark(preset.watermark)
 
+        # Patch write_image so raster exports get the correct print-DPI
+        self._patch_write_image()
+
         # Apply title config if specified
         if preset.title_config is not None:
             self.apply_title_config(preset.title_config)
@@ -137,9 +142,20 @@ class PlotlyAdapter(BaseAdapter):
             except Exception:
                 pass
 
+        # Restore original Figure.write_image if we patched it
+        if self._original_write_image is not None:
+            try:
+                import plotly.graph_objects as go
+
+                go.Figure.write_image = self._original_write_image
+                self._original_write_image = None
+            except Exception:
+                pass
+
         # Clear stored state
         self._current_template = None
         self._watermark_config = None
+        self._preset = None
 
     def apply_colorway(self, colorway: "Colorway") -> None:
         """
@@ -345,98 +361,121 @@ class PlotlyAdapter(BaseAdapter):
         """
         Configure Plotly template based on preset.
 
+        All visual properties are scaled with a single factor derived from
+        ``screen_dpi`` so that the font-to-canvas ratio matches Matplotlib.
+        The patched ``write_image`` then multiplies the rendering by
+        ``print_dpi / screen_dpi`` for raster exports.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
+        from sane_figs.utils.dpi_utils import get_screen_scale, get_screen_dimensions
+
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
 
-            # For HTML/browser output Plotly uses CSS pixels, not print inches.
-            # Scale figure_size (inches) by 150 px/in for a screen-friendly size.
-            # Scale font sizes from points using 96/72 (1 pt → CSS px).
-            screen_px_per_inch = 150
-            dpi_scale = 96 / 72.0  # 1 pt → CSS px at standard screen resolution
+            # Store preset for export-time DPI calculations
+            self._preset = preset
+
+            # Single consistent scale: screen_dpi / 72
+            # 1 pt = 1/72 in; screen has screen_dpi px/in  →  1 pt = scale px
+            scale = get_screen_scale(preset)
+            width_px, height_px = get_screen_dimensions(preset)
 
             # Grid and Spines settings (mimic Matplotlib)
-            grid_color = "rgba(0,0,0,0.1)"  # Light gray with transparency
+            grid_color = "rgba(0,0,0,0.1)"
             axis_line_color = "black"
 
-            # Create layout dictionary
+            # Shared axis configuration
+            def _axis_config():
+                return dict(
+                    title=dict(font=dict(size=preset.font_size.get("label", 12) * scale)),
+                    tickfont=dict(size=preset.font_size.get("tick", 10) * scale),
+                    showgrid=True,
+                    gridcolor=grid_color,
+                    gridwidth=0.5 * scale,
+                    showline=True,
+                    linecolor=axis_line_color,
+                    linewidth=0.8 * scale,
+                    mirror=False,
+                    ticks="outside",
+                    ticklen=4 * scale,
+                    tickcolor=axis_line_color,
+                    nticks=6,
+                )
+
             layout_dict = dict(
-                # Fixed screen-friendly pixel dimensions
-                width=int(preset.figure_size[0] * screen_px_per_inch),
-                height=int(preset.figure_size[1] * screen_px_per_inch),
+                width=width_px,
+                height=height_px,
                 font=dict(
                     family=preset.font_family,
-                    size=preset.font_size.get("label", 12) * dpi_scale,
+                    size=preset.font_size.get("label", 12) * scale,
                 ),
-                # Title
-                title=dict(font=dict(size=preset.font_size.get("title", 14) * dpi_scale)),
-                # Axis labels and ticks
-                xaxis=dict(
-                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
-                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
-                    # Grid
-                    showgrid=True,
-                    gridcolor=grid_color,
-                    gridwidth=0.5 * dpi_scale,
-                    # Spines (Axis Lines)
-                    showline=True,
-                    linecolor=axis_line_color,
-                    linewidth=0.8 * dpi_scale,
-                    # Mirror (off)
-                    mirror=False,
-                    # Ticks
-                    ticks="outside",
-                    ticklen=4 * dpi_scale,
-                    tickcolor=axis_line_color,
-                    nticks=6,
-                ),
-                yaxis=dict(
-                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
-                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
-                    # Grid
-                    showgrid=True,
-                    gridcolor=grid_color,
-                    gridwidth=0.5 * dpi_scale,
-                    # Spines (Axis Lines)
-                    showline=True,
-                    linecolor=axis_line_color,
-                    linewidth=0.8 * dpi_scale,
-                    # Mirror (off)
-                    mirror=False,
-                    # Ticks
-                    ticks="outside",
-                    ticklen=4 * dpi_scale,
-                    tickcolor=axis_line_color,
-                    nticks=6,
-                ),
-                # Legend
-                legend=dict(font=dict(size=preset.font_size.get("legend", 10) * dpi_scale)),
-                # Colorway
+                title=dict(font=dict(size=preset.font_size.get("title", 14) * scale)),
+                xaxis=_axis_config(),
+                yaxis=_axis_config(),
+                legend=dict(font=dict(size=preset.font_size.get("legend", 10) * scale)),
                 colorway=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"],
             )
 
-            # Create the Template object with explicit layout
             template = go.layout.Template(layout=layout_dict)
 
             # Set trace defaults
             template.data.scatter = [
                 go.Scatter(
-                    line=dict(width=preset.line_width * dpi_scale),
-                    marker=dict(size=preset.marker_size * dpi_scale),
+                    line=dict(width=preset.line_width * scale),
+                    marker=dict(size=preset.marker_size * scale),
                 )
             ]
 
-            # Store the template for later modification (e.g., colorway)
             self._current_template = template
 
-            # Register and apply template
             pio.templates["sane_figs"] = template
             pio.templates.default = "sane_figs"
         except Exception as e:
             print(f"Error configuring Plotly template: {e}")
+            pass
+
+    def _patch_write_image(self) -> None:
+        """Patch ``Figure.write_image`` to apply print-DPI scaling.
+
+        When the caller does not explicitly pass ``width``, ``height``, or
+        ``scale``, this wrapper injects ``scale = print_dpi / screen_dpi``
+        so the exported raster matches Matplotlib's ``savefig`` output.
+        """
+        try:
+            import plotly.graph_objects as go
+            from sane_figs.utils.dpi_utils import get_export_scale_factor
+
+            if self._original_write_image is not None:
+                return  # already patched
+
+            self._original_write_image = go.Figure.write_image
+
+            adapter_self = self
+            original_write_image = self._original_write_image
+
+            def write_image_with_scaling(fig_self, *args, **kwargs):
+                """Write image with automatic print-DPI scaling."""
+                if adapter_self._preset is not None:
+                    # Only inject scale when the caller hasn't set any of
+                    # width/height/scale, to avoid overriding explicit intent.
+                    has_explicit_size = (
+                        "width" in kwargs
+                        or "height" in kwargs
+                        or "scale" in kwargs
+                    )
+                    if not has_explicit_size:
+                        kwargs["scale"] = get_export_scale_factor(
+                            adapter_self._preset
+                        )
+
+                return original_write_image(fig_self, *args, **kwargs)
+
+            go.Figure.write_image = write_image_with_scaling
+
+        except Exception:
             pass
 
     def _handle_version_specifics(self) -> None:

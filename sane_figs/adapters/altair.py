@@ -26,6 +26,9 @@ class AltairAdapter(BaseAdapter):
         (3, 0, 0): "_handle_v3_0_plus",
     }
 
+    # Raster file extensions that need print-DPI scale factor on export
+    _RASTER_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"})
+
     def __init__(self) -> None:
         """Initialize the Altair adapter."""
         super().__init__("altair")
@@ -34,6 +37,7 @@ class AltairAdapter(BaseAdapter):
         self._current_theme = None
         self._base_theme_config = None  # Store the base theme config to avoid recursion
         self._watermark_config = None
+        self._preset = None  # Store preset for export-time DPI calculations
 
     def _import_altair(self) -> bool:
         """
@@ -99,6 +103,10 @@ class AltairAdapter(BaseAdapter):
         if preset.watermark is not None:
             self.add_watermark(preset.watermark)
 
+        # Patch Chart.save so raster exports get the correct print-DPI
+        # scale factor (this is idempotent if add_watermark already patched)
+        self._patch_chart_save()
+
         # Apply title config if specified
         if preset.title_config is not None:
             self.apply_title_config(preset.title_config)
@@ -125,9 +133,20 @@ class AltairAdapter(BaseAdapter):
             except Exception:
                 pass
 
+        # Restore original Chart.save if we patched it
+        try:
+            import altair as alt
+
+            if hasattr(alt.Chart, "_original_save"):
+                alt.Chart.save = alt.Chart._original_save
+                del alt.Chart._original_save
+        except Exception:
+            pass
+
         # Clear stored state
         self._current_theme = None
         self._watermark_config = None
+        self._preset = None
 
     def apply_colorway(self, colorway: "Colorway") -> None:
         """
@@ -192,31 +211,55 @@ class AltairAdapter(BaseAdapter):
         # Store watermark config
         self._watermark_config = config
 
-        # Patch Chart.save to add watermark automatically
+        # _patch_chart_save handles both watermarks and export scaling
+        self._patch_chart_save()
+
+    def _patch_chart_save(self) -> None:
+        """Patch ``alt.Chart.save`` to handle watermarks and raster export scaling.
+
+        For raster formats (.png, .jpg, …) the patch injects a ``scale_factor``
+        equal to ``print_dpi / screen_dpi`` so the exported image has the same
+        pixel dimensions and element sizes as Matplotlib's ``savefig`` output.
+        The caller can still override ``scale_factor`` explicitly.
+        """
         try:
             import altair as alt
-            
-            # Save original save method if not already saved
-            if not hasattr(alt.Chart, '_original_save'):
-                alt.Chart._original_save = alt.Chart.save
-            
+            from pathlib import Path
+            from sane_figs.utils.dpi_utils import get_export_scale_factor
+
+            # Only patch once
+            if hasattr(alt.Chart, "_original_save"):
+                return
+
+            alt.Chart._original_save = alt.Chart.save
+
             adapter_self = self
             original_save = alt.Chart._original_save
-            
-            def save_with_watermark(self, fp, *args, **kwargs):
-                """Save chart with watermark added."""
+
+            def save_with_scaling(chart_self, fp, *args, **kwargs):
+                """Save chart with optional watermark and print-DPI scaling."""
+                target = chart_self
+
+                # Add watermark if configured
                 if adapter_self._watermark_config is not None:
-                    # Add watermark to chart
-                    chart_with_watermark = adapter_self._add_watermark_to_chart_internal(
-                        self, adapter_self._watermark_config
+                    target = adapter_self._add_watermark_to_chart_internal(
+                        chart_self, adapter_self._watermark_config
                     )
-                    # Call original save with the watermarked chart
-                    return original_save(chart_with_watermark, fp, *args, **kwargs)
-                else:
-                    return original_save(self, fp, *args, **kwargs)
-            
-            alt.Chart.save = save_with_watermark
-            
+
+                # Inject scale_factor for raster exports when not overridden
+                if adapter_self._preset is not None:
+                    fp_str = str(fp)
+                    suffix = Path(fp_str).suffix.lower() if fp_str else ""
+                    if suffix in AltairAdapter._RASTER_EXTENSIONS:
+                        if "scale_factor" not in kwargs:
+                            kwargs["scale_factor"] = get_export_scale_factor(
+                                adapter_self._preset
+                            )
+
+                return original_save(target, fp, *args, **kwargs)
+
+            alt.Chart.save = save_with_scaling
+
         except Exception:
             pass
 
@@ -425,62 +468,70 @@ class AltairAdapter(BaseAdapter):
         """
         Configure Altair theme based on preset.
 
+        All visual properties (dimensions, fonts, line widths, markers) are
+        scaled with a single factor derived from ``screen_dpi``.  This keeps
+        the font-to-canvas ratio identical to what Matplotlib produces.
+
+        When saving to a raster format the patched ``Chart.save`` multiplies
+        the entire rendering by ``print_dpi / screen_dpi`` so that the
+        resulting PNG matches Matplotlib's ``savefig`` output pixel-for-pixel.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
-        try:
-            # Convert point sizes to pixels for Altair
-            # Altair uses pixels for font sizes, while preset uses points
-            # Conversion: pixels = points * (DPI / 72)
-            dpi_scale = preset.dpi / 72.0
+        from sane_figs.utils.dpi_utils import get_screen_scale, get_screen_dimensions
 
-            # For Altair charts (which are displayed primarily on screens),
-            # use screen_dpi for pixel dimensions rather than print DPI.
-            # Fonts still scale with print dpi to maintain physical size intent.
-            screen_dpi = preset.get_display_dpi()
+        try:
+            # Store preset for export-time DPI calculations
+            self._preset = preset
+
+            # Single consistent scale: screen_dpi / 72
+            # 1 pt = 1/72 in; screen has screen_dpi px/in  →  1 pt = scale px
+            scale = get_screen_scale(preset)
+            width_px, height_px = get_screen_dimensions(preset)
 
             # Create the base theme config
             base_theme_config = {
                 "config": {
                     "view": {
-                        "width": int(preset.figure_size[0] * screen_dpi),
-                        "height": int(preset.figure_size[1] * screen_dpi),
+                        "width": width_px,
+                        "height": height_px,
                         # Remove border around the chart (matches spines.top/right=False)
                         "stroke": "transparent",
                     },
                     "font": preset.font_family,
                     "title": {
                         "font": preset.font_family,
-                        "fontSize": preset.font_size.get("title", 14) * dpi_scale,
+                        "fontSize": preset.font_size.get("title", 14) * scale,
                         "fontWeight": "bold",
                         "anchor": "start",  # Match Matplotlib's left-aligned title
-                        "offset": 10,
+                        "offset": 10 * scale,
                     },
                     "axis": {
                         "titleFont": preset.font_family,
                         "labelFont": preset.font_family,
-                        "titleFontSize": preset.font_size.get("label", 12) * dpi_scale,
-                        "labelFontSize": preset.font_size.get("tick", 10) * dpi_scale,
+                        "titleFontSize": preset.font_size.get("label", 12) * scale,
+                        "labelFontSize": preset.font_size.get("tick", 10) * scale,
                         # Grid settings (matches axes.grid=True)
                         "grid": True,
                         "gridOpacity": 0.3,
-                        "gridWidth": 0.5 * dpi_scale,
+                        "gridWidth": 0.5 * scale,
                         "gridColor": "black",
                         # Tick settings
-                        "tickCount": 5,  # Heuristic for sparse ticks
+                        "tickCount": 5,
                         "ticks": True,
-                        "tickWidth": 0.5 * dpi_scale,
-                        "tickSize": 4 * dpi_scale,
+                        "tickWidth": 0.5 * scale,
+                        "tickSize": 4 * scale,
                         # Axis Line settings (spines)
-                        "domain": True,  # Show axis line
+                        "domain": True,
                         "domainColor": "black",
-                        "domainWidth": 0.8 * dpi_scale,
+                        "domainWidth": 0.8 * scale,
                     },
                     "legend": {
                         "titleFont": preset.font_family,
                         "labelFont": preset.font_family,
-                        "titleFontSize": preset.font_size.get("legend", 10) * dpi_scale,
-                        "labelFontSize": preset.font_size.get("legend", 10) * dpi_scale,
+                        "titleFontSize": preset.font_size.get("legend", 10) * scale,
+                        "labelFontSize": preset.font_size.get("legend", 10) * scale,
                     },
                     "header": {
                         "titleFont": preset.font_family,
@@ -490,17 +541,17 @@ class AltairAdapter(BaseAdapter):
                         "font": preset.font_family,
                     },
                     "mark": {
-                        "strokeWidth": preset.line_width * dpi_scale,
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "strokeWidth": preset.line_width * scale,
+                        "size": (preset.marker_size * scale) ** 2,
                     },
                     "point": {
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "size": (preset.marker_size * scale) ** 2,
                     },
                     "circle": {
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "size": (preset.marker_size * scale) ** 2,
                     },
                     "square": {
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "size": (preset.marker_size * scale) ** 2,
                     },
                 }
             }
