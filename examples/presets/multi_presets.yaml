@@ -7,6 +7,7 @@ presets:
     figure:
       size: [8.9, 6.9]  # Nature's recommended single column size
       dpi: 300
+      screen_dpi: 100
     typography:
       font_family: "sans-serif"
       font_sizes:
@@ -27,6 +28,7 @@ presets:
     figure:
       size: [5.5, 5.5]  # Science's recommended size
       dpi: 300
+      screen_dpi: 100
     typography:
       font_family: "sans-serif"
       font_sizes:
@@ -47,6 +49,7 @@ presets:
     figure:
       size: [7.0, 5.0]
       dpi: 300
+      screen_dpi: 100
     typography:
       font_family: "sans-serif"
       font_sizes:
