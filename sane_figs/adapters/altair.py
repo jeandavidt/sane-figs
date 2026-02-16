@@ -35,10 +35,13 @@ class AltairAdapter(BaseAdapter):
         self._altair = None
         self._original_theme = None
         self._current_theme = None
+        self._theme_fn = None  # Single stable theme function
         self._base_theme_config = None  # Store the base theme config to avoid recursion
         self._watermark_config = None
         self._current_colorway = None  # Store current colorway to persist through theme updates
         self._preset = None  # Store preset for export-time DPI calculations
+        self._original_chart_init = None  # For patching alt.Chart.__init__
+        self._screen_dimensions = (200, 200)  # Updated in _patch_chart_init
 
     def _import_altair(self) -> bool:
         """
@@ -144,8 +147,19 @@ class AltairAdapter(BaseAdapter):
         except Exception:
             pass
 
+        # Restore original Chart.__init__ if we patched it
+        if self._original_chart_init is not None:
+            try:
+                import altair as alt
+
+                alt.Chart.__init__ = self._original_chart_init
+                self._original_chart_init = None
+            except Exception:
+                pass
+
         # Clear stored state
         self._current_theme = None
+        self._theme_fn = None
         self._base_theme_config = None
         self._current_colorway = None
         self._watermark_config = None
@@ -165,31 +179,15 @@ class AltairAdapter(BaseAdapter):
             # Store the colorway so it persists through theme updates
             self._current_colorway = colorway
 
-            # Update the current theme with the colorway
+            # Mutate the shared config dict in place.  The single stable theme
+            # function registered in _configure_theme always reads this dict, so
+            # no re-registration is needed.
             if self._base_theme_config is not None:
-                # Add colorway directly to base_theme_config so it persists
                 self._base_theme_config["config"]["range"] = {
                     "category": colorway.categorical,
                     "diverging": colorway.diverging,
                     "ordinal": colorway.qualitative,
                 }
-                self._update_altair_theme()
-            else:
-                # Fallback: create a new theme if base_theme_config doesn't exist
-                def colorway_theme():
-                    return {
-                        "config": {
-                            "range": {
-                                "category": colorway.categorical,
-                                "diverging": colorway.diverging,
-                                "ordinal": colorway.qualitative,
-                            }
-                        }
-                    }
-
-                self._altair.themes.register("sane_figs", colorway_theme)
-                self._altair.themes.enable("sane_figs")
-                self._current_theme = colorway_theme
         except Exception:
             pass
 
@@ -256,6 +254,51 @@ class AltairAdapter(BaseAdapter):
                 return original_save(target, fp, *args, **kwargs)
 
             alt.Chart.save = save_with_scaling
+
+        except Exception:
+            pass
+
+    def _patch_chart_init(self, width_px: int, height_px: int) -> None:
+        """Patch ``alt.Chart.__init__`` to set spec-level width/height.
+
+        ``config.view.width/height`` is only a Vega-Lite hint; embedding
+        environments (Marimo, Jupyter) can override it with container sizing.
+        Setting ``spec.width`` and ``spec.height`` directly takes precedence
+        over all container/responsive overrides, ensuring a fixed canvas.
+        """
+        try:
+            import altair as alt
+
+            if self._original_chart_init is not None:
+                return  # already patched
+
+            self._original_chart_init = alt.Chart.__init__
+
+            adapter_self = self
+            original_init = self._original_chart_init
+
+            def chart_init_with_fixed_size(chart_self, *args, **kwargs):
+                original_init(chart_self, *args, **kwargs)
+                if adapter_self._preset is None:
+                    return
+                try:
+                    # Altair schema uses a sentinel Undefined for unset values.
+                    # Only set if the user hasn't supplied explicit dimensions.
+                    from altair.utils.schemapi import Undefined
+
+                    w, h = adapter_self._screen_dimensions
+                    if chart_self.width is Undefined:
+                        chart_self.width = w
+                    if chart_self.height is Undefined:
+                        chart_self.height = h
+                except Exception:
+                    pass
+
+            alt.Chart.__init__ = chart_init_with_fixed_size
+
+            # Store dimensions so the closure can read updated values after
+            # preset changes without needing to re-patch.
+            self._screen_dimensions = (width_px, height_px)
 
         except Exception:
             pass
@@ -492,9 +535,19 @@ class AltairAdapter(BaseAdapter):
             scale = get_screen_scale(preset)
             width_px, height_px = get_screen_dimensions(preset)
 
+            # Vega-Lite `size` for point marks = actual symbol area in sq-px
+            # (πr² for a circle).  Matplotlib `markersize` is the DIAMETER in
+            # points.  Convert: size = π/4 * (diameter_px)².
+            import math as _math
+            _marker_area = _math.pi / 4.0 * (preset.marker_size * scale) ** 2
+
             # Create the base theme config
             base_theme_config = {
                 "config": {
+                    # Use padding autosize so Vega-Lite adds space for axis
+                    # labels, title, and ticks around the fixed plot area.
+                    # "none" would clip all text outside the view boundary.
+                    "autosize": "fit",
                     "background": ps.background_color,
                     "view": {
                         "width": width_px,
@@ -507,7 +560,7 @@ class AltairAdapter(BaseAdapter):
                         "font": preset.font_family,
                         "fontSize": preset.font_size.get("title", 14) * scale,
                         "fontWeight": ps.title_weight,
-                        "anchor": "start",  # Match Matplotlib's left-aligned title
+                        "anchor": "middle",  # Center-aligned title (matches Matplotlib default)
                         "offset": 10 * scale,
                     },
                     "axis": {
@@ -538,7 +591,9 @@ class AltairAdapter(BaseAdapter):
                         "labelFontSize": preset.font_size.get("legend", 10) * scale,
                         "fillColor": ps.background_color,
                         "strokeColor": ps.legend_edge_color if ps.legend_edge_color != "inherit" else ps.axis_line_color,
+                        "strokeWidth": ps.axis_line_width * scale,
                         "opacity": ps.legend_frame_opacity,
+                        "padding": 6,  # Inner padding (px) between items and border
                     },
                     "header": {
                         "titleFont": preset.font_family,
@@ -549,33 +604,44 @@ class AltairAdapter(BaseAdapter):
                     },
                     "mark": {
                         "strokeWidth": preset.line_width * scale,
-                        "size": (preset.marker_size * scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                     "point": {
-                        "size": (preset.marker_size * scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                     "circle": {
-                        "size": (preset.marker_size * scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                     "square": {
-                        "size": (preset.marker_size * scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                 }
             }
 
-            # Store the base theme config to avoid recursion
+            # Store the base theme config (mutable dict).
             self._base_theme_config = base_theme_config
 
-            # Create a custom theme function that returns the base config
-            def custom_theme():
-                return base_theme_config
+            # Register a single stable theme function that always reads the
+            # current dict.  apply_colorway() and other mutators just update
+            # the dict in place — no re-registration required.
+            adapter_self = self
 
-            # Store the theme for later modification (e.g., colorway)
-            self._current_theme = custom_theme
+            def _sane_figs_theme():
+                return adapter_self._base_theme_config
 
-            # Register and enable the custom theme
-            self._altair.themes.register("sane_figs", custom_theme)
+            self._theme_fn = _sane_figs_theme
+            self._current_theme = _sane_figs_theme
+
+            self._altair.themes.register("sane_figs", _sane_figs_theme)
             self._altair.themes.enable("sane_figs")
+
+            # Patch alt.Chart.__init__ to set spec-level width/height so the
+            # chart dimensions are fixed regardless of the embedding environment.
+            self._patch_chart_init(width_px, height_px)
         except Exception:
             pass
 
@@ -619,12 +685,13 @@ class AltairAdapter(BaseAdapter):
             return
 
         try:
+            # Vega-Lite title.anchor uses "start"/"middle"/"end", not "left"/"center"/"right"
             alignment_map = {
-                "left": "left",
-                "center": "center",
-                "right": "right",
+                "left": "start",
+                "center": "middle",
+                "right": "end",
             }
-            anchor = alignment_map.get(config.alignment, "center")
+            anchor = alignment_map.get(config.alignment, "middle")
 
             if self._base_theme_config is not None:
                 self._base_theme_config["config"]["title"]["anchor"] = anchor
@@ -698,26 +765,19 @@ class AltairAdapter(BaseAdapter):
             pass
 
     def _update_altair_theme(self) -> None:
-        """Update the Altair theme with the current base theme config.
+        """Ensure the colorway range is present in the shared config dict.
 
-        This method preserves the colorway range if one has been applied,
-        ensuring that subsequent theme updates (e.g., for legend config)
-        don't overwrite the colorway.
+        The single stable theme function registered in _configure_theme always
+        reads self._base_theme_config, so no re-registration is needed here.
+        This method only preserves the colorway range when other callers
+        (e.g., apply_title_config) modify the config dict.
         """
         try:
-            # Ensure colorway is preserved in the theme config
             if self._current_colorway is not None and "range" not in self._base_theme_config["config"]:
                 self._base_theme_config["config"]["range"] = {
                     "category": self._current_colorway.categorical,
                     "diverging": self._current_colorway.diverging,
                     "ordinal": self._current_colorway.qualitative,
                 }
-
-            def updated_theme():
-                return self._base_theme_config
-
-            self._altair.themes.register("sane_figs", updated_theme)
-            self._altair.themes.enable("sane_figs")
-            self._current_theme = updated_theme
         except Exception:
             pass
