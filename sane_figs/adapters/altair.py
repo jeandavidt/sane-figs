@@ -53,6 +53,16 @@ class AltairAdapter(BaseAdapter):
         """
         try:
             import altair as alt
+            import warnings
+
+            # Suppress noisy Altair 6 / Narwhals warnings about passing narwhals objects
+            # to is_pandas_dataframe, which often happens internally in Altair 6.
+            warnings.filterwarnings(
+                "ignore",
+                message="You passed a <class 'narwhals.stable.v1.DataFrame'> to is_pandas_dataframe",
+                category=UserWarning,
+                module="altair.utils.data"
+            )
 
             self._altair = alt
             return True
@@ -104,9 +114,8 @@ class AltairAdapter(BaseAdapter):
         if preset.colorway is not None:
             self.apply_colorway(preset.colorway)
 
-        # Apply watermark if specified
-        if preset.watermark is not None:
-            self.add_watermark(preset.watermark)
+        # Apply or clear watermark
+        self.add_watermark(preset.watermark)
 
         # Patch Chart.save so raster exports get the correct print-DPI
         # scale factor (this is idempotent if add_watermark already patched)
@@ -239,9 +248,10 @@ class AltairAdapter(BaseAdapter):
                 alt.TopLevelMixin._original_to_dict = alt.TopLevelMixin.to_dict
                 
                 def patched_to_dict(self, *args, **kwargs):
-                    # If it's a LayerChart, we force validate=False to avoid the buggy 
-                    # "LayerChart has no parameter named 'mark'" error.
-                    if isinstance(self, alt.LayerChart) and "validate" not in kwargs:
+                    # If it's a composite chart, we force validate=False to avoid buggy
+                    # "XChart has no parameter named 'mark'" errors in Altair 6.
+                    composite_types = (alt.LayerChart, alt.FacetChart, alt.ConcatChart, alt.HConcatChart, alt.VConcatChart)
+                    if isinstance(self, composite_types) and "validate" not in kwargs:
                         kwargs["validate"] = False
                     return alt.TopLevelMixin._original_to_dict(self, *args, **kwargs)
 
@@ -560,7 +570,7 @@ class AltairAdapter(BaseAdapter):
                     # Use padding autosize so Vega-Lite adds space for axis
                     # labels, title, and ticks around the fixed plot area.
                     # "none" would clip all text outside the view boundary.
-                    "autosize": "fit",
+                    "autosize": {"type": "fit", "contains": "padding"},
                     "background": ps.background_color,
                     "view": {
                         "width": width_px,
@@ -618,7 +628,11 @@ class AltairAdapter(BaseAdapter):
                     "mark": {
                         "strokeWidth": preset.line_width * scale,
                         "size": _marker_area,
-                        "filled": True,
+                        "filled": False,
+                    },
+                    "line": {
+                        "strokeWidth": preset.line_width * scale,
+                        "filled": False,
                     },
                     "point": {
                         "size": _marker_area,
@@ -630,6 +644,12 @@ class AltairAdapter(BaseAdapter):
                     },
                     "square": {
                         "size": _marker_area,
+                        "filled": True,
+                    },
+                    "bar": {
+                        "filled": True,
+                    },
+                    "area": {
                         "filled": True,
                     },
                 }

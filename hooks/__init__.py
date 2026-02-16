@@ -52,6 +52,7 @@ def on_pre_build(config):
                     "--mode",
                     "run",
                     "--no-show-code",
+                    "--no-sandbox",
                     "-o",
                     str(output_path),
                     "-f",

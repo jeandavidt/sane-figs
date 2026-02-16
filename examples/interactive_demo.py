@@ -53,12 +53,25 @@ def _():
 
 @app.cell
 def _(mo, sane_figs):
-    mo.md(f"""
-    # Sane-Figs v{sane_figs.__version__} Interactive Demo
+    return mo.vstack([
+        mo.md(f"""
+        # Sane-Figs v{sane_figs.__version__} Interactive Demo
 
-    Experiment with different libraries, styles, and colorways to see how **sane-figs** automatically styles your figures.
-    """)
-    return
+        Experiment with different libraries, styles, and colorways to see how **sane-figs** automatically styles your figures.
+        """),
+        mo.Html("""
+            <style>
+                .vega-embed, .js-plotly-plot { 
+                    max-width: 100% !important; 
+                    height: auto !important; 
+                }
+                .vega-embed canvas { 
+                    max-width: 100% !important; 
+                    height: auto !important; 
+                }
+            </style>
+        """)
+    ])
 
 
 @app.cell
@@ -187,14 +200,15 @@ def _(
         final_plot = mo.md(f"**Error generating plot:** {str(e)}")
 
 
-    # Display - for Altair, return directly without centering to avoid squeezing
-    # For other libraries, center the output
-    if selected_lib == "Altair":
-        _out=final_plot
-    else:
-        _out=mo.center(final_plot)
-    _out
-    return
+    # Display centered with responsive styling
+    centered_plot = mo.center(final_plot)
+    return mo.style(centered_plot, {
+        "max-width": "100%",
+        "overflow-x": "auto",
+        "display": "flex",
+        "flex-direction": "column",
+        "align-items": "center"
+    })
 
 
 @app.cell

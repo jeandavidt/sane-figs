@@ -259,8 +259,8 @@ _PRESENTATION_PRESET = Preset(
     name="presentation",
     mode="presentation",
     figure_size=(10.0, 5.6),  # ~75% of 16:9 slide area (13.33"×7.5" full slide)
-    dpi=150,  # Sufficient for screen/projector (~full HD output)
-    screen_dpi=150,
+    dpi=300,  # High quality for export
+    screen_dpi=100,  # Better for notebook/web display (fits standard containers)
     font_family="sans-serif",
     font_size={
         "title": 24.0,

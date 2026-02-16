@@ -98,9 +98,8 @@ class PlotlyAdapter(BaseAdapter):
         if preset.colorway is not None:
             self.apply_colorway(preset.colorway)
 
-        # Apply watermark if specified
-        if preset.watermark is not None:
-            self.add_watermark(preset.watermark)
+        # Apply or clear watermark
+        self.add_watermark(preset.watermark)
 
         # Patch write_image so raster exports get the correct print-DPI
         self._patch_write_image()
@@ -395,10 +394,10 @@ class PlotlyAdapter(BaseAdapter):
             # Bottom: x-axis tick numbers + x-axis label row
             # Top: title row + a little breathing room
             # Right: small gap after the last tick
-            _l = int(55 * scale)
-            _b = int(38 * scale)
-            _t = int(28 * scale)
-            _r = int(10 * scale)
+            _l = int(70 * scale)
+            _b = int(50 * scale)
+            _t = int(60 * scale)
+            _r = int(20 * scale)
 
             layout_dict = dict(
                 width=width_px,

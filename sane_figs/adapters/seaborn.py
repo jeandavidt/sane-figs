@@ -99,9 +99,8 @@ class SeabornAdapter(BaseAdapter):
         if preset.colorway is not None:
             self.apply_colorway(preset.colorway)
 
-        # Apply watermark if specified
-        if preset.watermark is not None:
-            self.add_watermark(preset.watermark)
+        # Apply or clear watermark
+        self.add_watermark(preset.watermark)
 
         # Apply title config if specified
         if preset.title_config is not None:

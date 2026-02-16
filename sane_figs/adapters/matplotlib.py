@@ -100,9 +100,8 @@ class MatplotlibAdapter(BaseAdapter):
         if preset.legend_config is not None:
             self.apply_legend_config(preset.legend_config)
 
-        # Apply watermark if specified
-        if preset.watermark is not None:
-            self.add_watermark(preset.watermark)
+        # Apply or clear watermark
+        self.add_watermark(preset.watermark)
 
     def reset_style(self) -> None:
         """
