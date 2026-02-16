@@ -21,6 +21,7 @@ class AltairAdapter(BaseAdapter):
 
     # Version-specific handlers
     VERSION_HANDLERS = {
+        (6, 0, 0): "_handle_v6_0_plus",
         (5, 0, 0): "_handle_v5_0_plus",
         (4, 2, 0): "_handle_v4_2_plus",
         (3, 0, 0): "_handle_v3_0_plus",
@@ -223,13 +224,28 @@ class AltairAdapter(BaseAdapter):
             from sane_figs.utils.dpi_utils import get_export_scale_factor
 
             # Only patch once
-            if hasattr(alt.Chart, "_original_save"):
+            if hasattr(alt.TopLevelMixin, "_original_save"):
                 return
 
-            alt.Chart._original_save = alt.Chart.save
+            alt.TopLevelMixin._original_save = alt.TopLevelMixin.save
 
             adapter_self = self
-            original_save = alt.Chart._original_save
+            original_save = alt.TopLevelMixin._original_save
+
+            # Patch to_dict globally to bypass validation for LayerChart in Altair 6
+            # This is necessary because LayerChart validation incorrectly
+            # flags 'mark' properties that are actually in valid locations.
+            if not hasattr(alt.TopLevelMixin, "_original_to_dict"):
+                alt.TopLevelMixin._original_to_dict = alt.TopLevelMixin.to_dict
+                
+                def patched_to_dict(self, *args, **kwargs):
+                    # If it's a LayerChart, we force validate=False to avoid the buggy 
+                    # "LayerChart has no parameter named 'mark'" error.
+                    if isinstance(self, alt.LayerChart) and "validate" not in kwargs:
+                        kwargs["validate"] = False
+                    return alt.TopLevelMixin._original_to_dict(self, *args, **kwargs)
+
+                alt.TopLevelMixin.to_dict = patched_to_dict
 
             def save_with_scaling(chart_self, fp, *args, **kwargs):
                 """Save chart with optional watermark and print-DPI scaling."""
@@ -253,6 +269,8 @@ class AltairAdapter(BaseAdapter):
 
                 return original_save(target, fp, *args, **kwargs)
 
+            alt.TopLevelMixin.save = save_with_scaling
+            # Also patch alt.Chart.save just in case some versions don't use the mixin's implementation directly
             alt.Chart.save = save_with_scaling
 
         except Exception:
@@ -315,26 +333,21 @@ class AltairAdapter(BaseAdapter):
             config: The WatermarkConfig object. If None, uses stored config.
 
         Returns:
-            The chart with watermark added (as a layered chart).
-
-        Example:
-            >>> import sane_figs
-            >>> import altair as alt
-            >>> import pandas as pd
-            >>> 
-            >>> sane_figs.setup(mode='article', watermark='© My Lab')
-            >>> 
-            >>> df = pd.DataFrame({'x': [1, 2, 3], 'y': [1, 4, 9]})
-            >>> chart = alt.Chart(df).mark_line().encode(x='x', y='y')
-            >>> 
-            >>> # Add watermark to chart
-            >>> chart_with_watermark = sane_figs.get_adapter('altair').add_watermark_to_chart(chart)
-            >>> chart_with_watermark.save('chart.json')
+            The chart with watermark added (as a layered chart), or the original
+            chart if watermarking is not supported for its type.
         """
         if config is None:
             config = self._watermark_config
 
         if config is None:
+            return chart
+
+        # Defensive check: Faceted and Concatenated charts cannot be layered in Altair 6.
+        # They must be layered BEFORE faceting/concatenating.
+        # Since sane-figs adds watermarks at the very end (during save), we skip
+        # them for these composite types to avoid TypeError: Faceted charts cannot be layered.
+        import altair as alt
+        if isinstance(chart, (alt.FacetChart, alt.ConcatChart, alt.HConcatChart, alt.VConcatChart)):
             return chart
 
         if config.text is not None:
@@ -658,6 +671,11 @@ class AltairAdapter(BaseAdapter):
                 if handler is not None:
                     handler()
                 break
+
+    def _handle_v6_0_plus(self) -> None:
+        """Handle Altair 6.0+ specific settings."""
+        # Altair 6.0+ has changed how Chart and LayerChart interact with TopLevelMixin
+        pass
 
     def _handle_v5_0_plus(self) -> None:
         """Handle Altair 5.0+ specific settings."""

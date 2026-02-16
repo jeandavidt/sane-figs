@@ -68,6 +68,9 @@ def apply_global_setup(
         else:
             preset_watermark = watermark
         preset.watermark = preset_watermark
+    else:
+        # Clear previous watermark if not provided in this setup call
+        preset.watermark = None
 
     # Override legend config if provided
     if legend_config is not None:
