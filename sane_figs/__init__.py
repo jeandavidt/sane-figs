@@ -7,7 +7,11 @@ with popular Python visualization libraries.
 
 from pathlib import Path
 
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("sane-figs")
+except Exception:
+    __version__ = "0.1.2"  # fallback for editable/dev installs
 __author__ = "Jean-David T."
 __license__ = "MIT"
 
