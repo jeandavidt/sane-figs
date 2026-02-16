@@ -7,14 +7,14 @@
 #     "numpy==2.4.2",
 #     "pandas==3.0.0",
 #     "plotly==6.5.2",
-#     "sane-figs",
+#     "sane-figs>=0.2.0",
 #     "seaborn==0.13.2",
 # ]
 # ///
 
 import marimo
 
-__generated_with = "0.19.10"
+__generated_with = "0.19.11"
 app = marimo.App(width="medium")
 
 
@@ -52,9 +52,9 @@ def _():
 
 
 @app.cell
-def _(mo):
-    mo.md(r"""
-    # Sane-Figs Interactive Demo
+def _(mo, sane_figs):
+    mo.md(f"""
+    # Sane-Figs v{sane_figs.__version__} Interactive Demo
 
     Experiment with different libraries, styles, and colorways to see how **sane-figs** automatically styles your figures.
     """)
