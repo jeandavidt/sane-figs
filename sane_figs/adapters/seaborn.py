@@ -391,7 +391,18 @@ class SeabornAdapter(BaseAdapter):
 
         # Build rcParams from preset + plot_style
         style_params = {
-            # Font sizing
+            # Figure size and DPI — must be set explicitly because sns.set_theme /
+            # set_context does not touch these and they stay at matplotlib defaults
+            # (6.4×4.8 in at 100 DPI) otherwise.
+            "figure.figsize": list(preset.figure_size),
+            "figure.dpi": preset.get_display_dpi(),
+            "savefig.dpi": preset.dpi,
+            "savefig.bbox": "tight",
+            # Font sizing — font.size must be explicit here because set_theme
+            # calls set_context() before applying rc=, and "paper"/"talk"
+            # context scaling overrides font.size.  Putting it in rc= ensures
+            # it is applied last and wins over the context multiplier.
+            "font.size": preset.font_size.get("label", 12.0),
             "axes.labelsize": preset.font_size.get("label", 12.0),
             "xtick.labelsize": preset.font_size.get("tick", 10.0),
             "ytick.labelsize": preset.font_size.get("tick", 10.0),
@@ -399,6 +410,7 @@ class SeabornAdapter(BaseAdapter):
             "axes.titlesize": preset.font_size.get("title", 14.0),
             "axes.titleweight": ps.title_weight,
             "lines.linewidth": preset.line_width,
+            "lines.markersize": preset.marker_size,
             "font.family": preset.font_family,
             # Background
             "axes.facecolor": ps.background_color,
