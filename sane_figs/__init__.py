@@ -11,7 +11,7 @@ try:
     from importlib.metadata import version as _pkg_version
     __version__ = _pkg_version("sane-figs")
 except Exception:
-    __version__ = "0.1.2"  # fallback for editable/dev installs
+    __version__ = "0.2.0"  # fallback for editable/dev installs
 __author__ = "Jean-David T."
 __license__ = "MIT"
 
