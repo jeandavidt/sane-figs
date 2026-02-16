@@ -375,6 +375,8 @@ class PlotlyAdapter(BaseAdapter):
                     showgrid=ps.grid_visible,
                     gridcolor=grid_color,
                     gridwidth=ps.grid_width * scale,
+                    # Zero-line: disable to match matplotlib's default style
+                    zeroline=False,
                     # Spines
                     showline=True,
                     linecolor=ps.axis_line_color,
@@ -387,16 +389,39 @@ class PlotlyAdapter(BaseAdapter):
                     nticks=6,
                 )
 
+            # Compact margins in screen pixels (kaleido scales them along with
+            # everything else when write_image(scale=…) is called).
+            # Left: room for rotated y-axis label + widest tick number (~"-1.0")
+            # Bottom: x-axis tick numbers + x-axis label row
+            # Top: title row + a little breathing room
+            # Right: small gap after the last tick
+            _l = int(55 * scale)
+            _b = int(38 * scale)
+            _t = int(28 * scale)
+            _r = int(10 * scale)
+
             layout_dict = dict(
                 width=width_px,
                 height=height_px,
+                autosize=False,
+                margin=dict(l=_l, r=_r, t=_t, b=_b, pad=0),
                 font=dict(
                     family=preset.font_family,
                     size=preset.font_size.get("label", 12) * scale,
                 ),
                 paper_bgcolor=ps.background_color,
                 plot_bgcolor=ps.background_color,
-                title=dict(font=dict(size=preset.font_size.get("title", 14) * scale)),
+                title=dict(
+                    font=dict(
+                        size=preset.font_size.get("title", 14) * scale,
+                        weight=ps.title_weight,
+                    ),
+                    # Center over the plot area, not the full figure (which would
+                    # be off-center due to unequal left/right margins)
+                    x=0.5,
+                    xanchor="center",
+                    xref="paper",
+                ),
                 xaxis=_axis_config(),
                 yaxis=_axis_config(),
                 legend=dict(
@@ -407,6 +432,9 @@ class PlotlyAdapter(BaseAdapter):
                         if ps.legend_edge_color == "inherit"
                         else ps.legend_edge_color
                     ),
+                    borderwidth=ps.axis_line_width * scale,
+                    # Remove gap between trace groups so legend is compact like matplotlib
+                    tracegroupgap=0,
                 ),
                 colorway=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"],
             )
@@ -527,14 +555,14 @@ class PlotlyAdapter(BaseAdapter):
                 # Call original __init__
                 original_init(fig_self, *args, **kwargs)
 
-                # Apply template dimensions if not explicitly set
+                # Always enforce fixed dimensions and disable responsive sizing.
+                # Template values don't propagate to Python layout objects at init
+                # time, so we must set these explicitly on every figure.
                 if adapter_self._template_dimensions is not None:
                     width, height = adapter_self._template_dimensions
-                    # Only set if not already set by the user
-                    if fig_self.layout.width is None:
-                        fig_self.layout.width = width
-                    if fig_self.layout.height is None:
-                        fig_self.layout.height = height
+                    fig_self.layout.width = width
+                    fig_self.layout.height = height
+                    fig_self.layout.autosize = False
 
                 # Add watermark to the figure if configured
                 if adapter_self._watermark_config is not None:
@@ -587,15 +615,17 @@ class PlotlyAdapter(BaseAdapter):
         try:
             import plotly.io as pio
 
-            alignment_map = {
-                "left": "left",
-                "center": "center",
-                "right": "right",
-            }
-            xanchor = alignment_map.get(config.alignment, "center")
+            # x position (0=left, 0.5=center, 1=right) in paper coordinates
+            x_map = {"left": 0.0, "center": 0.5, "right": 1.0}
+            xanchor_map = {"left": "left", "center": "center", "right": "right"}
+
+            x_val = x_map.get(config.alignment, 0.5)
+            xanchor = xanchor_map.get(config.alignment, "center")
 
             if self._current_template is not None:
+                self._current_template.layout.title.x = x_val
                 self._current_template.layout.title.xanchor = xanchor
+                self._current_template.layout.title.xref = "paper"
                 pio.templates["sane_figs"] = self._current_template
                 pio.templates.default = "sane_figs"
         except Exception:
