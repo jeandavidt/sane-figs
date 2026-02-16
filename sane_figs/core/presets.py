@@ -15,6 +15,7 @@ from sane_figs.styling.colorways import (
     MARIMO_COLORWAY,
 )
 from sane_figs.styling.layout import (
+    PlotStyle,
     TitleConfig,
     LegendConfig,
     AxisTitleSpacingConfig,
@@ -35,6 +36,9 @@ class Preset:
         font_size: Dictionary of font sizes for different elements.
         line_width: Line width for plots.
         marker_size: Marker size for scatter plots.
+        plot_style: Shared visual chrome (grid, spines, background, …).
+            Defaults to ``_BASE_PLOT_STYLE`` which gives a clean white
+            look with light gridlines—identical across all adapters.
         colorway: Colorway to use.
         watermark: Optional watermark configuration.
         title_config: Configuration for title alignment.
@@ -51,6 +55,7 @@ class Preset:
     line_width: float = 1.5
     marker_size: float = 6.0
     screen_dpi: int | None = None
+    plot_style: PlotStyle = field(default_factory=PlotStyle)
     colorway: "Colorway | None" = None
     watermark: "WatermarkConfig | None" = None
     title_config: "TitleConfig | None" = None
@@ -240,6 +245,7 @@ _ARTICLE_PRESET = Preset(
     },
     line_width=1.0,
     marker_size=4.0,
+    plot_style=PlotStyle(),
     colorway=None,  # Will be set to DEFAULT_COLORWAY
     watermark=None,
     legend_config=_DEFAULT_LEGEND_CONFIG,
@@ -265,6 +271,7 @@ _PRESENTATION_PRESET = Preset(
     },
     line_width=2.5,
     marker_size=9.0,
+    plot_style=PlotStyle(),
     colorway=None,  # Will be set to VIBRANT_COLORWAY
     watermark=None,
     legend_config=_DEFAULT_LEGEND_CONFIG,
@@ -288,6 +295,7 @@ _ULAVAL_PRESET = Preset(
     },
     line_width=1.5,
     marker_size=6.0,
+    plot_style=PlotStyle(),
     colorway=ULAVAL_COLORWAY,
     watermark=None,
     legend_config=_DEFAULT_LEGEND_CONFIG,
@@ -311,6 +319,7 @@ _MODELEAU_PRESET = Preset(
     },
     line_width=1.5,
     marker_size=6.0,
+    plot_style=PlotStyle(),
     colorway=MODELEAU_COLORWAY,
     watermark=None,
     legend_config=_DEFAULT_LEGEND_CONFIG,
@@ -334,6 +343,7 @@ _MARIMO_PRESET = Preset(
     },
     line_width=2.0,
     marker_size=8.0,
+    plot_style=PlotStyle(),
     colorway=MARIMO_COLORWAY,
     watermark=None,
     legend_config=_DEFAULT_LEGEND_CONFIG,
@@ -357,6 +367,7 @@ _LATEX_PRESET = Preset(
     },
     line_width=1.0,
     marker_size=5.0,
+    plot_style=PlotStyle(),
     colorway=None,  # Default colorway suitable for LaTeX
     watermark=None,
     legend_config=_DEFAULT_LEGEND_CONFIG,

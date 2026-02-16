@@ -8,6 +8,7 @@ mode: "custom"
 figure:
   size: [7.0, 5.0]  # [width, height] in inches
   dpi: 300  # High resolution for print
+  screen_dpi: 100  # On-screen / HTML rendering DPI
 
 # Typography settings
 typography:

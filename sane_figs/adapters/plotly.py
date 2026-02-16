@@ -34,6 +34,9 @@ class PlotlyAdapter(BaseAdapter):
         self._current_template = None
         self._watermark_config = None
         self._original_figure_init = None
+        self._original_write_image = None
+        self._preset = None  # Store preset for export-time DPI calculations
+        self._template_dimensions = None  # Store (width, height) for figure patching
 
     def _import_plotly(self) -> bool:
         """
@@ -99,6 +102,9 @@ class PlotlyAdapter(BaseAdapter):
         if preset.watermark is not None:
             self.add_watermark(preset.watermark)
 
+        # Patch write_image so raster exports get the correct print-DPI
+        self._patch_write_image()
+
         # Apply title config if specified
         if preset.title_config is not None:
             self.apply_title_config(preset.title_config)
@@ -137,9 +143,21 @@ class PlotlyAdapter(BaseAdapter):
             except Exception:
                 pass
 
+        # Restore original Figure.write_image if we patched it
+        if self._original_write_image is not None:
+            try:
+                import plotly.graph_objects as go
+
+                go.Figure.write_image = self._original_write_image
+                self._original_write_image = None
+            except Exception:
+                pass
+
         # Clear stored state
         self._current_template = None
         self._watermark_config = None
+        self._preset = None
+        self._template_dimensions = None
 
     def apply_colorway(self, colorway: "Colorway") -> None:
         """
@@ -181,37 +199,9 @@ class PlotlyAdapter(BaseAdapter):
         if not self.is_available():
             return
 
-        # Store watermark config
+        # Store watermark config - the patching is handled by _patch_figure_init
+        # which is called from _configure_template
         self._watermark_config = config
-
-        # Patch the Figure class to add watermarks automatically
-        try:
-            import plotly.graph_objects as go
-
-            # Save original __init__ if not already saved
-            if self._original_figure_init is None:
-                self._original_figure_init = go.Figure.__init__
-
-            # Create a wrapper that adds watermark after initialization
-            adapter_self = self
-            original_init = self._original_figure_init
-
-            def figure_init_with_watermark(fig_self, *args, **kwargs):
-                """Initialize figure and add watermark."""
-                # Call original __init__
-                original_init(fig_self, *args, **kwargs)
-
-                # Add watermark to the figure
-                if adapter_self._watermark_config is not None:
-                    adapter_self._add_watermark_to_figure(fig_self, adapter_self._watermark_config)
-
-            # Patch Figure.__init__
-            go.Figure.__init__ = figure_init_with_watermark
-
-        except Exception as e:
-            print(f"Warning: Failed to patch Plotly Figure class: {e}")
-            import traceback
-            traceback.print_exc()
 
     def _add_watermark_to_figure(self, fig, config: "WatermarkConfig") -> None:
         """
@@ -345,98 +335,242 @@ class PlotlyAdapter(BaseAdapter):
         """
         Configure Plotly template based on preset.
 
+        All visual chrome is read from ``preset.plot_style`` so every preset
+        renders identically.
+
+        All visual properties are scaled with a single factor derived from
+        ``screen_dpi`` so that the font-to-canvas ratio matches Matplotlib.
+        The patched ``write_image`` then multiplies the rendering by
+        ``print_dpi / screen_dpi`` for raster exports.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
+        from sane_figs.utils.dpi_utils import get_screen_scale, get_screen_dimensions
+
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
 
-            # For HTML/browser output Plotly uses CSS pixels, not print inches.
-            # Scale figure_size (inches) by 150 px/in for a screen-friendly size.
-            # Scale font sizes from points using 96/72 (1 pt → CSS px).
-            screen_px_per_inch = 150
-            dpi_scale = 96 / 72.0  # 1 pt → CSS px at standard screen resolution
+            ps = preset.plot_style
 
-            # Grid and Spines settings (mimic Matplotlib)
-            grid_color = "rgba(0,0,0,0.1)"  # Light gray with transparency
-            axis_line_color = "black"
+            # Store preset for export-time DPI calculations
+            self._preset = preset
 
-            # Create layout dictionary
+            # Single consistent scale: screen_dpi / 72
+            # 1 pt = 1/72 in; screen has screen_dpi px/in  →  1 pt = scale px
+            scale = get_screen_scale(preset)
+            width_px, height_px = get_screen_dimensions(preset)
+
+            # Build a Plotly-compatible grid colour string from plot_style.
+            # Plotly expects opacity baked into an rgba() value.
+            grid_color = self._to_rgba(ps.grid_color, ps.grid_opacity)
+
+            # Shared axis config driven by plot_style
+            def _axis_config():
+                return dict(
+                    title=dict(font=dict(size=preset.font_size.get("label", 12) * scale)),
+                    tickfont=dict(size=preset.font_size.get("tick", 10) * scale),
+                    # Grid
+                    showgrid=ps.grid_visible,
+                    gridcolor=grid_color,
+                    gridwidth=ps.grid_width * scale,
+                    # Zero-line: disable to match matplotlib's default style
+                    zeroline=False,
+                    # Spines
+                    showline=True,
+                    linecolor=ps.axis_line_color,
+                    linewidth=ps.axis_line_width * scale,
+                    mirror=False,
+                    # Ticks
+                    ticks=ps.tick_direction if ps.tick_direction != "both" else "inside",
+                    ticklen=ps.tick_length * scale,
+                    tickcolor=ps.tick_color,
+                    nticks=6,
+                )
+
+            # Compact margins in screen pixels (kaleido scales them along with
+            # everything else when write_image(scale=…) is called).
+            # Left: room for rotated y-axis label + widest tick number (~"-1.0")
+            # Bottom: x-axis tick numbers + x-axis label row
+            # Top: title row + a little breathing room
+            # Right: small gap after the last tick
+            _l = int(55 * scale)
+            _b = int(38 * scale)
+            _t = int(28 * scale)
+            _r = int(10 * scale)
+
             layout_dict = dict(
-                # Fixed screen-friendly pixel dimensions
-                width=int(preset.figure_size[0] * screen_px_per_inch),
-                height=int(preset.figure_size[1] * screen_px_per_inch),
+                width=width_px,
+                height=height_px,
+                autosize=False,
+                margin=dict(l=_l, r=_r, t=_t, b=_b, pad=0),
                 font=dict(
                     family=preset.font_family,
-                    size=preset.font_size.get("label", 12) * dpi_scale,
+                    size=preset.font_size.get("label", 12) * scale,
                 ),
-                # Title
-                title=dict(font=dict(size=preset.font_size.get("title", 14) * dpi_scale)),
-                # Axis labels and ticks
-                xaxis=dict(
-                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
-                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
-                    # Grid
-                    showgrid=True,
-                    gridcolor=grid_color,
-                    gridwidth=0.5 * dpi_scale,
-                    # Spines (Axis Lines)
-                    showline=True,
-                    linecolor=axis_line_color,
-                    linewidth=0.8 * dpi_scale,
-                    # Mirror (off)
-                    mirror=False,
-                    # Ticks
-                    ticks="outside",
-                    ticklen=4 * dpi_scale,
-                    tickcolor=axis_line_color,
-                    nticks=6,
+                paper_bgcolor=ps.background_color,
+                plot_bgcolor=ps.background_color,
+                title=dict(
+                    font=dict(
+                        size=preset.font_size.get("title", 14) * scale,
+                        weight=ps.title_weight,
+                    ),
+                    # Center over the plot area, not the full figure (which would
+                    # be off-center due to unequal left/right margins)
+                    x=0.5,
+                    xanchor="center",
+                    xref="paper",
                 ),
-                yaxis=dict(
-                    title=dict(font=dict(size=preset.font_size.get("label", 12) * dpi_scale)),
-                    tickfont=dict(size=preset.font_size.get("tick", 10) * dpi_scale),
-                    # Grid
-                    showgrid=True,
-                    gridcolor=grid_color,
-                    gridwidth=0.5 * dpi_scale,
-                    # Spines (Axis Lines)
-                    showline=True,
-                    linecolor=axis_line_color,
-                    linewidth=0.8 * dpi_scale,
-                    # Mirror (off)
-                    mirror=False,
-                    # Ticks
-                    ticks="outside",
-                    ticklen=4 * dpi_scale,
-                    tickcolor=axis_line_color,
-                    nticks=6,
+                xaxis=_axis_config(),
+                yaxis=_axis_config(),
+                legend=dict(
+                    font=dict(size=preset.font_size.get("legend", 10) * scale),
+                    bgcolor=ps.background_color,
+                    bordercolor=(
+                        ps.axis_line_color
+                        if ps.legend_edge_color == "inherit"
+                        else ps.legend_edge_color
+                    ),
+                    borderwidth=ps.axis_line_width * scale,
+                    # Remove gap between trace groups so legend is compact like matplotlib
+                    tracegroupgap=0,
                 ),
-                # Legend
-                legend=dict(font=dict(size=preset.font_size.get("legend", 10) * dpi_scale)),
-                # Colorway
                 colorway=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"],
             )
 
-            # Create the Template object with explicit layout
             template = go.layout.Template(layout=layout_dict)
 
             # Set trace defaults
             template.data.scatter = [
                 go.Scatter(
-                    line=dict(width=preset.line_width * dpi_scale),
-                    marker=dict(size=preset.marker_size * dpi_scale),
+                    line=dict(width=preset.line_width * scale),
+                    marker=dict(size=preset.marker_size * scale),
                 )
             ]
 
-            # Store the template for later modification (e.g., colorway)
             self._current_template = template
+            self._template_dimensions = (width_px, height_px)
 
-            # Register and apply template
             pio.templates["sane_figs"] = template
             pio.templates.default = "sane_figs"
+
+            # Patch Figure.__init__ to apply template dimensions
+            self._patch_figure_init()
         except Exception as e:
             print(f"Error configuring Plotly template: {e}")
+            pass
+
+    @staticmethod
+    def _to_rgba(color: str, opacity: float) -> str:
+        """Convert a named or hex colour + opacity to a Plotly ``rgba()`` string."""
+        # Handle common named colours directly to avoid import overhead
+        named = {
+            "black": (0, 0, 0),
+            "white": (255, 255, 255),
+            "gray": (128, 128, 128),
+            "grey": (128, 128, 128),
+            "red": (255, 0, 0),
+            "green": (0, 128, 0),
+            "blue": (0, 0, 255),
+        }
+        low = color.lower().strip()
+        if low in named:
+            r, g, b = named[low]
+            return f"rgba({r},{g},{b},{opacity})"
+        if low.startswith("#") and len(low) in (4, 7):
+            if len(low) == 4:
+                r = int(low[1] * 2, 16)
+                g = int(low[2] * 2, 16)
+                b = int(low[3] * 2, 16)
+            else:
+                r = int(low[1:3], 16)
+                g = int(low[3:5], 16)
+                b = int(low[5:7], 16)
+            return f"rgba({r},{g},{b},{opacity})"
+        # Fallback: return as-is (e.g. already an rgba string)
+        return color
+
+    def _patch_write_image(self) -> None:
+        """Patch ``Figure.write_image`` to apply print-DPI scaling.
+
+        When the caller does not explicitly pass ``width``, ``height``, or
+        ``scale``, this wrapper injects ``scale = print_dpi / screen_dpi``
+        so the exported raster matches Matplotlib's ``savefig`` output.
+        """
+        try:
+            import plotly.graph_objects as go
+            from sane_figs.utils.dpi_utils import get_export_scale_factor
+
+            if self._original_write_image is not None:
+                return  # already patched
+
+            self._original_write_image = go.Figure.write_image
+
+            adapter_self = self
+            original_write_image = self._original_write_image
+
+            def write_image_with_scaling(fig_self, *args, **kwargs):
+                """Write image with automatic print-DPI scaling."""
+                if adapter_self._preset is not None:
+                    # Only inject scale when the caller hasn't set any of
+                    # width/height/scale, to avoid overriding explicit intent.
+                    has_explicit_size = (
+                        "width" in kwargs
+                        or "height" in kwargs
+                        or "scale" in kwargs
+                    )
+                    if not has_explicit_size:
+                        kwargs["scale"] = get_export_scale_factor(
+                            adapter_self._preset
+                        )
+
+                return original_write_image(fig_self, *args, **kwargs)
+
+            go.Figure.write_image = write_image_with_scaling
+
+        except Exception:
+            pass
+
+    def _patch_figure_init(self) -> None:
+        """Patch ``Figure.__init__`` to apply template dimensions.
+
+        Plotly templates can set width/height, but figures don't inherit these
+        values - they remain None and Plotly uses responsive sizing. This patch
+        ensures each figure gets the template's width/height applied.
+        """
+        try:
+            import plotly.graph_objects as go
+
+            if self._original_figure_init is not None:
+                return  # already patched
+
+            self._original_figure_init = go.Figure.__init__
+
+            adapter_self = self
+            original_init = self._original_figure_init
+
+            def figure_init_with_dimensions(fig_self, *args, **kwargs):
+                """Initialize figure and apply template dimensions."""
+                # Call original __init__
+                original_init(fig_self, *args, **kwargs)
+
+                # Always enforce fixed dimensions and disable responsive sizing.
+                # Template values don't propagate to Python layout objects at init
+                # time, so we must set these explicitly on every figure.
+                if adapter_self._template_dimensions is not None:
+                    width, height = adapter_self._template_dimensions
+                    fig_self.layout.width = width
+                    fig_self.layout.height = height
+                    fig_self.layout.autosize = False
+
+                # Add watermark to the figure if configured
+                if adapter_self._watermark_config is not None:
+                    adapter_self._add_watermark_to_figure(fig_self, adapter_self._watermark_config)
+
+            go.Figure.__init__ = figure_init_with_dimensions
+
+        except Exception:
             pass
 
     def _handle_version_specifics(self) -> None:
@@ -481,15 +615,17 @@ class PlotlyAdapter(BaseAdapter):
         try:
             import plotly.io as pio
 
-            alignment_map = {
-                "left": "left",
-                "center": "center",
-                "right": "right",
-            }
-            xanchor = alignment_map.get(config.alignment, "center")
+            # x position (0=left, 0.5=center, 1=right) in paper coordinates
+            x_map = {"left": 0.0, "center": 0.5, "right": 1.0}
+            xanchor_map = {"left": "left", "center": "center", "right": "right"}
+
+            x_val = x_map.get(config.alignment, 0.5)
+            xanchor = xanchor_map.get(config.alignment, "center")
 
             if self._current_template is not None:
+                self._current_template.layout.title.x = x_val
                 self._current_template.layout.title.xanchor = xanchor
+                self._current_template.layout.title.xref = "paper"
                 pio.templates["sane_figs"] = self._current_template
                 pio.templates.default = "sane_figs"
         except Exception:

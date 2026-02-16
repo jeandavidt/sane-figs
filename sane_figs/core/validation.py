@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sane_figs.core.presets import Preset
     from sane_figs.styling.colorways import Colorway
+    from sane_figs.styling.layout import PlotStyle
     from sane_figs.styling.watermarks import WatermarkConfig
 
 
@@ -137,6 +138,18 @@ def validate_preset(preset: "Preset") -> list[ValidationError]:
             )
         )
 
+    # Validate plot_style if present
+    if preset.plot_style is not None:
+        plot_style_errors = validate_plot_style(preset.plot_style)
+        errors.extend(
+            [
+                ValidationError(
+                    field=f"plot_style.{e.field}", message=e.message, severity=e.severity
+                )
+                for e in plot_style_errors
+            ]
+        )
+
     # Validate colorway if present
     if preset.colorway is not None:
         colorway_errors = validate_colorway(preset.colorway)
@@ -159,6 +172,75 @@ def validate_preset(preset: "Preset") -> list[ValidationError]:
                 )
                 for e in watermark_errors
             ]
+        )
+
+    return errors
+
+
+def validate_plot_style(plot_style: "PlotStyle") -> list[ValidationError]:
+    """
+    Validate a PlotStyle object.
+
+    Args:
+        plot_style: The PlotStyle object to validate.
+
+    Returns:
+        List of validation errors. Empty list if valid.
+    """
+    errors: list[ValidationError] = []
+
+    # String fields that must be non-empty
+    for field_name in ("background_color", "grid_color", "axis_line_color", "tick_color", "title_weight", "legend_edge_color"):
+        value = getattr(plot_style, field_name, None)
+        if not isinstance(value, str) or not value:
+            errors.append(
+                ValidationError(
+                    field=field_name,
+                    message=f"{field_name} must be a non-empty string, got {value!r}.",
+                )
+            )
+
+    # Boolean fields
+    for field_name in ("grid_visible", "show_top_spine", "show_right_spine"):
+        value = getattr(plot_style, field_name, None)
+        if not isinstance(value, bool):
+            errors.append(
+                ValidationError(
+                    field=field_name,
+                    message=f"{field_name} must be a boolean, got {type(value).__name__}.",
+                )
+            )
+
+    # Positive number fields
+    for field_name in ("grid_width", "axis_line_width", "tick_length"):
+        value = getattr(plot_style, field_name, None)
+        if not isinstance(value, (int, float)) or value <= 0:
+            errors.append(
+                ValidationError(
+                    field=field_name,
+                    message=f"{field_name} must be a positive number, got {value}.",
+                )
+            )
+
+    # Opacity fields (0-1 range)
+    for field_name in ("grid_opacity", "legend_frame_opacity"):
+        value = getattr(plot_style, field_name, None)
+        if not isinstance(value, (int, float)) or not (0.0 <= value <= 1.0):
+            errors.append(
+                ValidationError(
+                    field=field_name,
+                    message=f"{field_name} must be between 0.0 and 1.0, got {value}.",
+                )
+            )
+
+    # tick_direction enum
+    valid_tick_directions = ("outside", "inside", "both")
+    if plot_style.tick_direction not in valid_tick_directions:
+        errors.append(
+            ValidationError(
+                field="tick_direction",
+                message=f"tick_direction must be one of {valid_tick_directions}, got {plot_style.tick_direction!r}.",
+            )
         )
 
     return errors

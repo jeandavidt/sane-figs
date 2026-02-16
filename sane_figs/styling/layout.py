@@ -18,6 +18,51 @@ LegendPositionType = Literal[
     "outside_bottom",
 ]
 
+TickDirectionType = Literal["outside", "inside", "both"]
+
+
+@dataclass
+class PlotStyle:
+    """Shared visual "chrome" for a plot.
+
+    Every property that was previously hard-coded inside individual adapters
+    now lives here so that all four backends (Matplotlib, Seaborn, Altair,
+    Plotly) render identically from a single source of truth.
+
+    Attributes:
+        background_color: Axes / plot-area background colour.
+        grid_visible: Whether to show grid lines.
+        grid_color: Grid line colour (before opacity is applied).
+        grid_opacity: Grid line transparency (0 = invisible, 1 = solid).
+        grid_width: Grid line width in points.
+        axis_line_color: Colour for the left / bottom axis lines (spines).
+        axis_line_width: Width of the left / bottom spines in points.
+        show_top_spine: Whether to draw the top spine.
+        show_right_spine: Whether to draw the right spine.
+        tick_direction: Tick mark direction relative to the axis.
+        tick_length: Tick mark length in points.
+        tick_color: Tick mark colour.
+        title_weight: Font weight for the axes title.
+        legend_frame_opacity: Background opacity of the legend box (0–1).
+        legend_edge_color: Colour of the legend frame edge.
+    """
+
+    background_color: str = "white"
+    grid_visible: bool = True
+    grid_color: str = "black"
+    grid_opacity: float = 0.3
+    grid_width: float = 0.5
+    axis_line_color: str = "black"
+    axis_line_width: float = 0.8
+    show_top_spine: bool = False
+    show_right_spine: bool = False
+    tick_direction: TickDirectionType = "outside"
+    tick_length: float = 4.0
+    tick_color: str = "black"
+    title_weight: str = "bold"
+    legend_frame_opacity: float = 0.9
+    legend_edge_color: str = "inherit"
+
 
 @dataclass
 class TitleConfig:

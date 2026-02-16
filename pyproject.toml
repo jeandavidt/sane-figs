@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sane-figs"
-version = "0.1.2"
+version = "0.2.0"
 description = "Publication-ready figures for Matplotlib, Seaborn, Plotly, and Altair"
 readme = "README.md"
 license = {text = "MIT"}
@@ -118,7 +118,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=sane_figs --cov-report=term-missing --strict-markers"
+addopts = "-v --strict-markers"
 markers = [
     "visual: marks tests as visual regression tests",
     "matplotlib_min: tests for matplotlib minimum version (2.0.x)",

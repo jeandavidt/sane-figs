@@ -7,7 +7,11 @@ with popular Python visualization libraries.
 
 from pathlib import Path
 
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("sane-figs")
+except Exception:
+    __version__ = "0.2.0"  # fallback for editable/dev installs
 __author__ = "Jean-David T."
 __license__ = "MIT"
 
@@ -31,10 +35,18 @@ from sane_figs.styling.colorways import (
     PASTEL_COLORWAY,
     COLORBLIND_SAFE_COLORWAY,
 )
+from sane_figs.styling.layout import PlotStyle
 from sane_figs.styling.watermarks import (
     WatermarkConfig,
     create_image_watermark,
     create_text_watermark,
+)
+from sane_figs.utils.dpi_utils import (
+    detect_screen_dpi,
+    get_screen_scale,
+    get_export_scale_factor,
+    get_export_dimensions,
+    get_screen_dimensions,
 )
 
 # Import main functions after they are defined
@@ -541,6 +553,7 @@ __all__ = [
     "__license__",
     # Core classes
     "Preset",
+    "PlotStyle",
     "Colorway",
     "WatermarkConfig",
     # Presets
@@ -579,4 +592,10 @@ __all__ = [
     "setup_seaborn",
     "setup_plotly",
     "setup_altair",
+    # DPI utilities
+    "detect_screen_dpi",
+    "get_screen_scale",
+    "get_export_scale_factor",
+    "get_export_dimensions",
+    "get_screen_dimensions",
 ]

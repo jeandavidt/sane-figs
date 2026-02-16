@@ -26,14 +26,22 @@ class AltairAdapter(BaseAdapter):
         (3, 0, 0): "_handle_v3_0_plus",
     }
 
+    # Raster file extensions that need print-DPI scale factor on export
+    _RASTER_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"})
+
     def __init__(self) -> None:
         """Initialize the Altair adapter."""
         super().__init__("altair")
         self._altair = None
         self._original_theme = None
         self._current_theme = None
+        self._theme_fn = None  # Single stable theme function
         self._base_theme_config = None  # Store the base theme config to avoid recursion
         self._watermark_config = None
+        self._current_colorway = None  # Store current colorway to persist through theme updates
+        self._preset = None  # Store preset for export-time DPI calculations
+        self._original_chart_init = None  # For patching alt.Chart.__init__
+        self._screen_dimensions = (200, 200)  # Updated in _patch_chart_init
 
     def _import_altair(self) -> bool:
         """
@@ -99,6 +107,10 @@ class AltairAdapter(BaseAdapter):
         if preset.watermark is not None:
             self.add_watermark(preset.watermark)
 
+        # Patch Chart.save so raster exports get the correct print-DPI
+        # scale factor (this is idempotent if add_watermark already patched)
+        self._patch_chart_save()
+
         # Apply title config if specified
         if preset.title_config is not None:
             self.apply_title_config(preset.title_config)
@@ -125,9 +137,33 @@ class AltairAdapter(BaseAdapter):
             except Exception:
                 pass
 
+        # Restore original Chart.save if we patched it
+        try:
+            import altair as alt
+
+            if hasattr(alt.Chart, "_original_save"):
+                alt.Chart.save = alt.Chart._original_save
+                del alt.Chart._original_save
+        except Exception:
+            pass
+
+        # Restore original Chart.__init__ if we patched it
+        if self._original_chart_init is not None:
+            try:
+                import altair as alt
+
+                alt.Chart.__init__ = self._original_chart_init
+                self._original_chart_init = None
+            except Exception:
+                pass
+
         # Clear stored state
         self._current_theme = None
+        self._theme_fn = None
+        self._base_theme_config = None
+        self._current_colorway = None
         self._watermark_config = None
+        self._preset = None
 
     def apply_colorway(self, colorway: "Colorway") -> None:
         """
@@ -140,40 +176,18 @@ class AltairAdapter(BaseAdapter):
             return
 
         try:
-            # Update the current theme with the colorway
+            # Store the colorway so it persists through theme updates
+            self._current_colorway = colorway
+
+            # Mutate the shared config dict in place.  The single stable theme
+            # function registered in _configure_theme always reads this dict, so
+            # no re-registration is needed.
             if self._base_theme_config is not None:
-                # Create a new theme that merges the base theme with the colorway
-                def merged_theme():
-                    # Use the base theme config to avoid recursion
-                    theme_config = self._base_theme_config.copy()
-                    # Add colorway to the theme
-                    theme_config["config"]["range"] = {
-                        "category": colorway.categorical,
-                        "diverging": colorway.diverging,
-                        "ordinal": colorway.qualitative,
-                    }
-                    return theme_config
-
-                # Re-register the updated theme
-                self._altair.themes.register("sane_figs", merged_theme)
-                self._altair.themes.enable("sane_figs")
-                self._current_theme = merged_theme
-            else:
-                # Fallback: create a new theme if base_theme_config doesn't exist
-                def colorway_theme():
-                    return {
-                        "config": {
-                            "range": {
-                                "category": colorway.categorical,
-                                "diverging": colorway.diverging,
-                                "ordinal": colorway.qualitative,
-                            }
-                        }
-                    }
-
-                self._altair.themes.register("sane_figs", colorway_theme)
-                self._altair.themes.enable("sane_figs")
-                self._current_theme = colorway_theme
+                self._base_theme_config["config"]["range"] = {
+                    "category": colorway.categorical,
+                    "diverging": colorway.diverging,
+                    "ordinal": colorway.qualitative,
+                }
         except Exception:
             pass
 
@@ -192,31 +206,100 @@ class AltairAdapter(BaseAdapter):
         # Store watermark config
         self._watermark_config = config
 
-        # Patch Chart.save to add watermark automatically
+        # _patch_chart_save handles both watermarks and export scaling
+        self._patch_chart_save()
+
+    def _patch_chart_save(self) -> None:
+        """Patch ``alt.Chart.save`` to handle watermarks and raster export scaling.
+
+        For raster formats (.png, .jpg, …) the patch injects a ``scale_factor``
+        equal to ``print_dpi / screen_dpi`` so the exported image has the same
+        pixel dimensions and element sizes as Matplotlib's ``savefig`` output.
+        The caller can still override ``scale_factor`` explicitly.
+        """
         try:
             import altair as alt
-            
-            # Save original save method if not already saved
-            if not hasattr(alt.Chart, '_original_save'):
-                alt.Chart._original_save = alt.Chart.save
-            
+            from pathlib import Path
+            from sane_figs.utils.dpi_utils import get_export_scale_factor
+
+            # Only patch once
+            if hasattr(alt.Chart, "_original_save"):
+                return
+
+            alt.Chart._original_save = alt.Chart.save
+
             adapter_self = self
             original_save = alt.Chart._original_save
-            
-            def save_with_watermark(self, fp, *args, **kwargs):
-                """Save chart with watermark added."""
+
+            def save_with_scaling(chart_self, fp, *args, **kwargs):
+                """Save chart with optional watermark and print-DPI scaling."""
+                target = chart_self
+
+                # Add watermark if configured
                 if adapter_self._watermark_config is not None:
-                    # Add watermark to chart
-                    chart_with_watermark = adapter_self._add_watermark_to_chart_internal(
-                        self, adapter_self._watermark_config
+                    target = adapter_self._add_watermark_to_chart_internal(
+                        chart_self, adapter_self._watermark_config
                     )
-                    # Call original save with the watermarked chart
-                    return original_save(chart_with_watermark, fp, *args, **kwargs)
-                else:
-                    return original_save(self, fp, *args, **kwargs)
-            
-            alt.Chart.save = save_with_watermark
-            
+
+                # Inject scale_factor for raster exports when not overridden
+                if adapter_self._preset is not None:
+                    fp_str = str(fp)
+                    suffix = Path(fp_str).suffix.lower() if fp_str else ""
+                    if suffix in AltairAdapter._RASTER_EXTENSIONS:
+                        if "scale_factor" not in kwargs:
+                            kwargs["scale_factor"] = get_export_scale_factor(
+                                adapter_self._preset
+                            )
+
+                return original_save(target, fp, *args, **kwargs)
+
+            alt.Chart.save = save_with_scaling
+
+        except Exception:
+            pass
+
+    def _patch_chart_init(self, width_px: int, height_px: int) -> None:
+        """Patch ``alt.Chart.__init__`` to set spec-level width/height.
+
+        ``config.view.width/height`` is only a Vega-Lite hint; embedding
+        environments (Marimo, Jupyter) can override it with container sizing.
+        Setting ``spec.width`` and ``spec.height`` directly takes precedence
+        over all container/responsive overrides, ensuring a fixed canvas.
+        """
+        try:
+            import altair as alt
+
+            if self._original_chart_init is not None:
+                return  # already patched
+
+            self._original_chart_init = alt.Chart.__init__
+
+            adapter_self = self
+            original_init = self._original_chart_init
+
+            def chart_init_with_fixed_size(chart_self, *args, **kwargs):
+                original_init(chart_self, *args, **kwargs)
+                if adapter_self._preset is None:
+                    return
+                try:
+                    # Altair schema uses a sentinel Undefined for unset values.
+                    # Only set if the user hasn't supplied explicit dimensions.
+                    from altair.utils.schemapi import Undefined
+
+                    w, h = adapter_self._screen_dimensions
+                    if chart_self.width is Undefined:
+                        chart_self.width = w
+                    if chart_self.height is Undefined:
+                        chart_self.height = h
+                except Exception:
+                    pass
+
+            alt.Chart.__init__ = chart_init_with_fixed_size
+
+            # Store dimensions so the closure can read updated values after
+            # preset changes without needing to re-patch.
+            self._screen_dimensions = (width_px, height_px)
+
         except Exception:
             pass
 
@@ -425,62 +508,92 @@ class AltairAdapter(BaseAdapter):
         """
         Configure Altair theme based on preset.
 
+        All visual chrome (grid, spines, background, ticks) is read from
+        ``preset.plot_style`` so that every preset renders identically.
+
+        All visual properties (dimensions, fonts, line widths, markers) are
+        scaled with a single factor derived from ``screen_dpi``.  This keeps
+        the font-to-canvas ratio identical to what Matplotlib produces.
+
+        When saving to a raster format the patched ``Chart.save`` multiplies
+        the entire rendering by ``print_dpi / screen_dpi`` so that the
+        resulting PNG matches Matplotlib's ``savefig`` output pixel-for-pixel.
+
         Args:
             preset: The Preset object containing styling configuration.
         """
-        try:
-            # Convert point sizes to pixels for Altair
-            # Altair uses pixels for font sizes, while preset uses points
-            # Conversion: pixels = points * (DPI / 72)
-            dpi_scale = preset.dpi / 72.0
+        from sane_figs.utils.dpi_utils import get_screen_scale, get_screen_dimensions
 
-            # For Altair charts (which are displayed primarily on screens),
-            # use screen_dpi for pixel dimensions rather than print DPI.
-            # Fonts still scale with print dpi to maintain physical size intent.
-            screen_dpi = preset.get_display_dpi()
+        try:
+            ps = preset.plot_style
+
+            # Store preset for export-time DPI calculations
+            self._preset = preset
+
+            # Single consistent scale: screen_dpi / 72
+            # 1 pt = 1/72 in; screen has screen_dpi px/in  →  1 pt = scale px
+            scale = get_screen_scale(preset)
+            width_px, height_px = get_screen_dimensions(preset)
+
+            # Vega-Lite `size` for point marks = actual symbol area in sq-px
+            # (πr² for a circle).  Matplotlib `markersize` is the DIAMETER in
+            # points.  Convert: size = π/4 * (diameter_px)².
+            import math as _math
+            _marker_area = _math.pi / 4.0 * (preset.marker_size * scale) ** 2
 
             # Create the base theme config
             base_theme_config = {
                 "config": {
+                    # Use padding autosize so Vega-Lite adds space for axis
+                    # labels, title, and ticks around the fixed plot area.
+                    # "none" would clip all text outside the view boundary.
+                    "autosize": "fit",
+                    "background": ps.background_color,
                     "view": {
-                        "width": int(preset.figure_size[0] * screen_dpi),
-                        "height": int(preset.figure_size[1] * screen_dpi),
+                        "width": width_px,
+                        "height": height_px,
                         # Remove border around the chart (matches spines.top/right=False)
                         "stroke": "transparent",
                     },
                     "font": preset.font_family,
                     "title": {
                         "font": preset.font_family,
-                        "fontSize": preset.font_size.get("title", 14) * dpi_scale,
-                        "fontWeight": "bold",
-                        "anchor": "start",  # Match Matplotlib's left-aligned title
-                        "offset": 10,
+                        "fontSize": preset.font_size.get("title", 14) * scale,
+                        "fontWeight": ps.title_weight,
+                        "anchor": "middle",  # Center-aligned title (matches Matplotlib default)
+                        "offset": 10 * scale,
                     },
                     "axis": {
                         "titleFont": preset.font_family,
                         "labelFont": preset.font_family,
-                        "titleFontSize": preset.font_size.get("label", 12) * dpi_scale,
-                        "labelFontSize": preset.font_size.get("tick", 10) * dpi_scale,
-                        # Grid settings (matches axes.grid=True)
-                        "grid": True,
-                        "gridOpacity": 0.3,
-                        "gridWidth": 0.5 * dpi_scale,
-                        "gridColor": "black",
-                        # Tick settings
-                        "tickCount": 5,  # Heuristic for sparse ticks
+                        "titleFontSize": preset.font_size.get("label", 12) * scale,
+                        "labelFontSize": preset.font_size.get("tick", 10) * scale,
+                        # Grid
+                        "grid": ps.grid_visible,
+                        "gridOpacity": ps.grid_opacity,
+                        "gridWidth": ps.grid_width * scale,
+                        "gridColor": ps.grid_color,
+                        # Ticks
+                        "tickCount": 5,
                         "ticks": True,
-                        "tickWidth": 0.5 * dpi_scale,
-                        "tickSize": 4 * dpi_scale,
-                        # Axis Line settings (spines)
-                        "domain": True,  # Show axis line
-                        "domainColor": "black",
-                        "domainWidth": 0.8 * dpi_scale,
+                        "tickWidth": 0.5 * scale,
+                        "tickSize": ps.tick_length * scale,
+                        "tickColor": ps.tick_color,
+                        # Spines / domain
+                        "domain": True,
+                        "domainColor": ps.axis_line_color,
+                        "domainWidth": ps.axis_line_width * scale,
                     },
                     "legend": {
                         "titleFont": preset.font_family,
                         "labelFont": preset.font_family,
-                        "titleFontSize": preset.font_size.get("legend", 10) * dpi_scale,
-                        "labelFontSize": preset.font_size.get("legend", 10) * dpi_scale,
+                        "titleFontSize": preset.font_size.get("legend", 10) * scale,
+                        "labelFontSize": preset.font_size.get("legend", 10) * scale,
+                        "fillColor": ps.background_color,
+                        "strokeColor": ps.legend_edge_color if ps.legend_edge_color != "inherit" else ps.axis_line_color,
+                        "strokeWidth": ps.axis_line_width * scale,
+                        "opacity": ps.legend_frame_opacity,
+                        "padding": 6,  # Inner padding (px) between items and border
                     },
                     "header": {
                         "titleFont": preset.font_family,
@@ -490,34 +603,45 @@ class AltairAdapter(BaseAdapter):
                         "font": preset.font_family,
                     },
                     "mark": {
-                        "strokeWidth": preset.line_width * dpi_scale,
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "strokeWidth": preset.line_width * scale,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                     "point": {
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                     "circle": {
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                     "square": {
-                        "size": (preset.marker_size * dpi_scale) ** 2,
+                        "size": _marker_area,
+                        "filled": True,
                     },
                 }
             }
 
-            # Store the base theme config to avoid recursion
+            # Store the base theme config (mutable dict).
             self._base_theme_config = base_theme_config
 
-            # Create a custom theme function that returns the base config
-            def custom_theme():
-                return base_theme_config
+            # Register a single stable theme function that always reads the
+            # current dict.  apply_colorway() and other mutators just update
+            # the dict in place — no re-registration required.
+            adapter_self = self
 
-            # Store the theme for later modification (e.g., colorway)
-            self._current_theme = custom_theme
+            def _sane_figs_theme():
+                return adapter_self._base_theme_config
 
-            # Register and enable the custom theme
-            self._altair.themes.register("sane_figs", custom_theme)
+            self._theme_fn = _sane_figs_theme
+            self._current_theme = _sane_figs_theme
+
+            self._altair.themes.register("sane_figs", _sane_figs_theme)
             self._altair.themes.enable("sane_figs")
+
+            # Patch alt.Chart.__init__ to set spec-level width/height so the
+            # chart dimensions are fixed regardless of the embedding environment.
+            self._patch_chart_init(width_px, height_px)
         except Exception:
             pass
 
@@ -561,12 +685,13 @@ class AltairAdapter(BaseAdapter):
             return
 
         try:
+            # Vega-Lite title.anchor uses "start"/"middle"/"end", not "left"/"center"/"right"
             alignment_map = {
-                "left": "left",
-                "center": "center",
-                "right": "right",
+                "left": "start",
+                "center": "middle",
+                "right": "end",
             }
-            anchor = alignment_map.get(config.alignment, "center")
+            anchor = alignment_map.get(config.alignment, "middle")
 
             if self._base_theme_config is not None:
                 self._base_theme_config["config"]["title"]["anchor"] = anchor
@@ -640,14 +765,19 @@ class AltairAdapter(BaseAdapter):
             pass
 
     def _update_altair_theme(self) -> None:
-        """Update the Altair theme with the current base theme config."""
+        """Ensure the colorway range is present in the shared config dict.
+
+        The single stable theme function registered in _configure_theme always
+        reads self._base_theme_config, so no re-registration is needed here.
+        This method only preserves the colorway range when other callers
+        (e.g., apply_title_config) modify the config dict.
+        """
         try:
-
-            def updated_theme():
-                return self._base_theme_config
-
-            self._altair.themes.register("sane_figs", updated_theme)
-            self._altair.themes.enable("sane_figs")
-            self._current_theme = updated_theme
+            if self._current_colorway is not None and "range" not in self._base_theme_config["config"]:
+                self._base_theme_config["config"]["range"] = {
+                    "category": self._current_colorway.categorical,
+                    "diverging": self._current_colorway.diverging,
+                    "ordinal": self._current_colorway.qualitative,
+                }
         except Exception:
             pass

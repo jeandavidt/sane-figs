@@ -187,7 +187,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
     from sane_figs.core.presets import Preset
     from sane_figs.styling.colorways import get_colorway
     from sane_figs.styling.watermarks import WatermarkConfig
-    from sane_figs.styling.layout import TitleConfig, LegendConfig, AxisTitleSpacingConfig
+    from sane_figs.styling.layout import PlotStyle, TitleConfig, LegendConfig, AxisTitleSpacingConfig
 
     # Required fields
     if "name" not in data:
@@ -234,6 +234,23 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
             else:
                 # Inline colorway definition
                 colorway = _parse_colorway_from_dict(colorway_data)
+
+    # Parse plot_style (all fields optional, defaults from PlotStyle())
+    plot_style = PlotStyle()
+    if "plot_style" in data:
+        ps_data = data["plot_style"]
+        if isinstance(ps_data, dict):
+            ps_kwargs = {}
+            for key in (
+                "background_color", "grid_visible", "grid_color", "grid_opacity",
+                "grid_width", "axis_line_color", "axis_line_width",
+                "show_top_spine", "show_right_spine", "tick_direction",
+                "tick_length", "tick_color", "title_weight",
+                "legend_frame_opacity", "legend_edge_color",
+            ):
+                if key in ps_data:
+                    ps_kwargs[key] = ps_data[key]
+            plot_style = PlotStyle(**ps_kwargs)
 
     # Parse watermark
     watermark = None
@@ -291,6 +308,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
         font_size=font_sizes,
         line_width=line_width,
         marker_size=marker_size,
+        plot_style=plot_style,
         colorway=colorway,
         watermark=watermark,
         title_config=title_config,
@@ -526,6 +544,8 @@ figure:
   size: [6.4, 4.8]
   # DPI for output files (300 for print, 150 for slides)
   dpi: 300
+  # DPI for on-screen / HTML rendering (optional, defaults to 100)
+  # screen_dpi: 100
 
 # Typography settings
 typography:
@@ -545,6 +565,25 @@ elements:
   line_width: 1.5
   # Marker size for scatter plots
   marker_size: 6.0
+
+# Visual chrome (optional — all fields default to clean white style)
+# Uncomment and modify individual fields as needed.
+# plot_style:
+#   background_color: "white"
+#   grid_visible: true
+#   grid_color: "black"
+#   grid_opacity: 0.3          # 0.0 = invisible, 1.0 = solid
+#   grid_width: 0.5            # points
+#   axis_line_color: "black"
+#   axis_line_width: 0.8       # points
+#   show_top_spine: false
+#   show_right_spine: false
+#   tick_direction: "outside"  # outside | inside | both
+#   tick_length: 4.0           # points
+#   tick_color: "black"
+#   title_weight: "bold"
+#   legend_frame_opacity: 0.9  # 0.0 = transparent, 1.0 = opaque
+#   legend_edge_color: "inherit"  # "inherit" uses axis_line_color
 
 # Colorway: either a reference to a built-in colorway or inline definition
 # Option 1: Reference to built-in colorway
