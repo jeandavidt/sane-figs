@@ -340,7 +340,7 @@ class MatplotlibAdapter(BaseAdapter):
 
         # Figure settings
         self._matplotlib.rcParams["figure.figsize"] = preset.figure_size
-        self._matplotlib.rcParams["figure.dpi"] = preset.dpi
+        self._matplotlib.rcParams["figure.dpi"] = preset.get_display_dpi()
         self._matplotlib.rcParams["savefig.dpi"] = preset.dpi
         self._matplotlib.rcParams["savefig.bbox"] = "tight"
 
