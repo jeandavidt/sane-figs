@@ -148,6 +148,7 @@ docs_source/*.webmanifest
 
 .DS_Store
 uv.lock
+.claude/
 
 # Script output artifacts
 scripts/compare_output/*.png
