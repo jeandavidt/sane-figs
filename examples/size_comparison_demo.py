@@ -14,7 +14,7 @@
 
 import marimo
 
-__generated_with = "0.19.10"
+__generated_with = "0.19.11"
 app = marimo.App(width="medium")
 
 
@@ -37,8 +37,8 @@ async def install_packages():
 def import_libs():
     """Import all required libraries."""
     import marimo as mo
-    import plotly.express as px
     import plotly.graph_objects as go
+    import plotly.express as px
     import altair as alt
     import sane_figs
     import pandas as pd
@@ -138,13 +138,9 @@ def generate_plot(
     selected_library,
     selected_mode,
 ):
-    """Apply styling and generate the demo plot."""
+    """Apply styling and generate the demo plot using context manager."""
 
-    # Reset and apply sane-figs styling
-    sane_figs.reset()
-    sane_figs.setup(mode=selected_mode, colorway=selected_colorway)
-
-    # Get preset info for later use
+    # Get preset info first (before entering context)
     current_preset = sane_figs.get_preset(selected_mode)
 
     # Generate demo data
@@ -157,46 +153,58 @@ def generate_plot(
         'Signal D': np.cos(0.5*t) * 0.8
     })
 
-    # Create plot based on selected library
+    # Create plot based on selected library using context manager
     demo_plot = None
     plot_error = None
 
     try:
-        if selected_library == "Plotly":
-            # Melt data for Plotly Express
-            melted = demo_data.melt(
-                id_vars=['Time (s)'],
-                var_name='Signal',
-                value_name='Amplitude'
-            )
-            demo_plot = px.line(
-                melted,
-                x='Time (s)',
-                y='Amplitude',
-                color='Signal',
-                title=f'Demo Plot: {selected_mode} mode, {selected_colorway} colorway',
-                labels={'Amplitude': 'Amplitude (a.u.)'}
-            )
+        with sane_figs.publication_style(mode=selected_mode, colorway=selected_colorway):
+            if selected_library == "Plotly":
+                # Melt data for Plotly Express
+                melted = demo_data.melt(
+                    id_vars=['Time (s)'],
+                    var_name='Signal',
+                    value_name='Amplitude'
+                )
+                demo_plot = px.line(
+                    melted,
+                    x='Time (s)',
+                    y='Amplitude',
+                    color='Signal',
+                    title=f'Demo Plot: {selected_mode} mode, {selected_colorway} colorway',
+                    labels={'Amplitude': 'Amplitude (a.u.)'}
+                )
+                # Fix layout: proper margins to prevent overflow, y-axis label on left
+                demo_plot.update_layout(
+                    yaxis=dict(
+                        title=dict(standoff=10),
+                        side='left',
+                        automargin=True
+                    ),
+                    xaxis=dict(automargin=True),
+                    title=dict(automargin=True, yref='paper'),
+                    margin=dict(l=80, r=40, t=80, b=60)
+                )
 
-        elif selected_library == "Altair":
-            # Melt data for Altair
-            melted = demo_data.melt(
-                id_vars=['Time (s)'],
-                var_name='Signal',
-                value_name='Amplitude'
-            )
-            demo_plot = (
-                alt.Chart(melted)
-                .mark_line()
-                .encode(
-                    x=alt.X('Time (s):Q', title='Time (s)'),
-                    y=alt.Y('Amplitude:Q', title='Amplitude (a.u.)'),
-                    color='Signal:N'
+            elif selected_library == "Altair":
+                # Melt data for Altair
+                melted = demo_data.melt(
+                    id_vars=['Time (s)'],
+                    var_name='Signal',
+                    value_name='Amplitude'
                 )
-                .properties(
-                    title=f'Demo Plot: {selected_mode} mode, {selected_colorway} colorway'
+                demo_plot = (
+                    alt.Chart(melted)
+                    .mark_line()
+                    .encode(
+                        x=alt.X('Time (s):Q', title='Time (s)'),
+                        y=alt.Y('Amplitude:Q', title='Amplitude (a.u.)'),
+                        color='Signal:N'
+                    )
+                    .properties(
+                        title=f'Demo Plot: {selected_mode} mode, {selected_colorway} colorway'
+                    )
                 )
-            )
 
     except Exception as e:
         plot_error = str(e)
@@ -245,7 +253,9 @@ def create_size_comparison(current_preset, mo):
                 overflow: auto;">
 
         <!-- Legend -->
-        <div style="margin-bottom: 20px; padding: 10px; background: white; border-radius: 4px;">
+        <div style="position: relative;
+                    margin-bottom: 20px; padding: 10px; background: white;
+                    border-radius: 4px; z-index: 100;">
             <strong>Size Comparison Reference:</strong><br/>
             <span style="color: #6c757d;">━━</span> US Letter Paper (8.5" × 11")<br/>
             <span style="color: #0066cc;">━━</span> PowerPoint Slide (13.33" × 7.5")<br/>
@@ -253,58 +263,75 @@ def create_size_comparison(current_preset, mo):
             <span style="color: #dc3545;">━━</span> Your Figure ({fig_width}" × {fig_height}" @ {fig_dpi} DPI)
         </div>
 
-        <!-- US Letter outline -->
-        <div style="position: absolute;
-                    top: 80px; left: 40px;
-                    width: {letter_w}px;
-                    height: {letter_h}px;
-                    border: 2px dashed #6c757d;
-                    background: rgba(108, 117, 125, 0.03);">
-            <span style="position: absolute; top: -20px; left: 0;
-                         color: #6c757d; font-size: 11px; font-weight: 600;">
-                US Letter
-            </span>
-        </div>
+        <!-- Container for all positioned elements -->
+        <div style="position: relative; width: 100%; height: {container_h - 80}px;">
 
-        <!-- PowerPoint outline -->
-        <div style="position: absolute;
-                    top: 120px; left: 80px;
-                    width: {ppt_w}px;
-                    height: {ppt_h}px;
-                    border: 2px dashed #0066cc;
-                    background: rgba(0, 102, 204, 0.03);">
-            <span style="position: absolute; top: -20px; left: 0;
-                         color: #0066cc; font-size: 11px; font-weight: 600;">
-                PowerPoint Slide
-            </span>
-        </div>
+            <!-- US Letter outline - LARGEST, at the back (z-index: 1) -->
+            <div style="position: absolute;
+                        top: 0; left: 0;
+                        width: {letter_w}px;
+                        height: {letter_h}px;
+                        border: 2px dashed #6c757d;
+                        background: rgba(108, 117, 125, 0.03);
+                        z-index: 1;">
+                <span style="position: absolute; top: 5px; left: 5px;
+                             color: #6c757d; font-size: 11px; font-weight: 600;
+                             background: rgba(248, 249, 250, 0.9); padding: 2px 4px;
+                             border-radius: 2px;">
+                    US Letter (8.5" × 11")
+                </span>
+            </div>
 
-        <!-- 4-Up Printout outline -->
-        <div style="position: absolute;
-                    top: 140px; left: 100px;
-                    width: {four_up_w}px;
-                    height: {four_up_h}px;
-                    border: 2px dashed #28a745;
-                    background: rgba(40, 167, 69, 0.05);">
-            <span style="position: absolute; top: -20px; left: 0;
-                         color: #28a745; font-size: 11px; font-weight: 600;">
-                4-Up Printout Area
-            </span>
-        </div>
+            <!-- PowerPoint outline - z-index: 2 -->
+            <div style="position: absolute;
+                        top: 40px; left: 40px;
+                        width: {ppt_w}px;
+                        height: {ppt_h}px;
+                        border: 2px dashed #0066cc;
+                        background: rgba(0, 102, 204, 0.03);
+                        z-index: 2;">
+                <span style="position: absolute; top: 5px; left: 5px;
+                             color: #0066cc; font-size: 11px; font-weight: 600;
+                             background: rgba(248, 249, 250, 0.9); padding: 2px 4px;
+                             border-radius: 2px;">
+                    PowerPoint Slide (13.33" × 7.5")
+                </span>
+            </div>
 
-        <!-- Figure highlight box -->
-        <div style="position: absolute;
-                    top: 160px; left: 120px;
-                    width: {fig_w}px;
-                    height: {fig_h}px;
-                    border: 3px solid #dc3545;
-                    background: white;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    border-radius: 2px;">
-            <span style="position: absolute; top: -25px; left: 0;
-                         color: #dc3545; font-size: 12px; font-weight: bold;">
-                Your Figure
-            </span>
+            <!-- 4-Up Printout outline - z-index: 3 -->
+            <div style="position: absolute;
+                        top: 80px; left: 80px;
+                        width: {four_up_w}px;
+                        height: {four_up_h}px;
+                        border: 2px dashed #28a745;
+                        background: rgba(40, 167, 69, 0.05);
+                        z-index: 3;">
+                <span style="position: absolute; top: 5px; left: 5px;
+                             color: #28a745; font-size: 11px; font-weight: 600;
+                             background: rgba(248, 249, 250, 0.9); padding: 2px 4px;
+                             border-radius: 2px;">
+                    4-Up Printout Area (5.5" × 4.25")
+                </span>
+            </div>
+
+            <!-- Figure highlight box - SMALLEST, at the front (z-index: 10) -->
+            <div style="position: absolute;
+                        top: 120px; left: 120px;
+                        width: {fig_w}px;
+                        height: {fig_h}px;
+                        border: 3px solid #dc3545;
+                        background: rgba(255, 255, 255, 0.95);
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        border-radius: 2px;
+                        z-index: 10;">
+                <span style="position: absolute; top: 5px; left: 5px;
+                             color: #dc3545; font-size: 12px; font-weight: bold;
+                             background: white; padding: 2px 6px;
+                             border-radius: 2px; border: 1px solid #dc3545;">
+                    Your Figure ({fig_width}" × {fig_height}")
+                </span>
+            </div>
+
         </div>
 
         <div style="margin-top: 20px; padding: 10px; background: #fff3cd;
@@ -330,10 +357,10 @@ def display_output(
     show_size_comparison,
 ):
     """Display the plot with optional size comparison."""
-    _out=None
+    _out = None
     # Handle errors
     if plot_error:
-        _out=mo.md(f"""
+        _out = mo.md(f"""
         ### ⚠️ Error Generating Plot
 
         **Error message:** `{plot_error}`
@@ -344,25 +371,33 @@ def display_output(
         # Display info banner
         info = mo.md(f"""
         ### Generated Figure
-    
+
         **Mode:** {selected_mode} | **Dimensions:** {fig_width}" × {fig_height}"
         """)
-    
+
+        # Center the plot for better display
+        centered_plot = mo.center(demo_plot)
+
         # Show output based on comparison toggle
         if show_size_comparison:
-            _out=mo.vstack([
+            _out = mo.vstack([
                 info,
                 comparison_view,
                 mo.md("---"),
                 mo.md("### The Plot:"),
-                demo_plot
+                centered_plot
             ])
         else:
-            _out=mo.vstack([
+            _out = mo.vstack([
                 info,
-                demo_plot
+                centered_plot
             ])
     _out
+    return
+
+
+@app.cell
+def _():
     return
 
 

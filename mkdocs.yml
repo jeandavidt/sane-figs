@@ -11,7 +11,6 @@ nav:
   - Colorways: colorways.md
   - Watermarks: watermarks.md
   - Interactive Demo: interactive_demo.html
-  - Size Comparison tool: size_comparison_demo.html
   - Libraries:
     - Matplotlib: libraries/matplotlib.md
     - Seaborn: libraries/seaborn.md

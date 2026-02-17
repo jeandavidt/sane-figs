@@ -23,8 +23,15 @@ async def _():
     """Install packages and configure matplotlib cache for WASM BEFORE importing matplotlib."""
     import sys
     import os
-    # Check if we're running in Pyodide (WASM environment)
+
+    # CRITICAL: Set matplotlib cache dir BEFORE any matplotlib import
+    # This prevents "building font cache" hangs in WASM environments
     if "pyodide" in sys.modules:
+        # In WASM, use a temporary directory for matplotlib cache
+        os.environ['MPLCONFIGDIR'] = "/tmp/matplotlib-config"
+        os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
+        print("📝 Matplotlib cache configured for WASM")
+
         import micropip
         # Install dependencies from PyPI
         print("📦 Installing dependencies from PyPI...")
@@ -33,6 +40,13 @@ async def _():
         await micropip.install("altair")
         await micropip.install("sane-figs")
         print("✅ All packages installed successfully!")
+    else:
+        # Even in native environment, set a consistent cache location
+        # to avoid race conditions and font cache rebuilds
+        cache_dir = os.path.expanduser("~/.cache/matplotlib-sane-figs")
+        os.environ['MPLCONFIGDIR'] = cache_dir
+        os.makedirs(cache_dir, exist_ok=True)
+        print("📝 Matplotlib cache configured")
     return
 
 
@@ -51,27 +65,12 @@ def _():
     return alt, mo, np, pd, plt, px, sane_figs, sns
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, sane_figs):
-    return mo.vstack([
-        mo.md(f"""
-        # Sane-Figs v{sane_figs.__version__} Interactive Demo
-
-        Experiment with different libraries, styles, and colorways to see how **sane-figs** automatically styles your figures.
-        """),
-        mo.Html("""
-            <style>
-                .vega-embed, .js-plotly-plot { 
-                    max-width: 100% !important; 
-                    height: auto !important; 
-                }
-                .vega-embed canvas { 
-                    max-width: 100% !important; 
-                    height: auto !important; 
-                }
-            </style>
-        """)
-    ])
+    mo.md(f"""
+    ## Sane figs v{sane_figs.__version__} interactive demo
+    """)
+    return
 
 
 @app.cell
@@ -202,13 +201,8 @@ def _(
 
     # Display centered with responsive styling
     centered_plot = mo.center(final_plot)
-    return mo.style(centered_plot, {
-        "max-width": "100%",
-        "overflow-x": "auto",
-        "display": "flex",
-        "flex-direction": "column",
-        "align-items": "center"
-    })
+    centered_plot
+    return
 
 
 @app.cell
