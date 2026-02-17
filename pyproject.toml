@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sane-figs"
-version = "0.2.4"
+version = "0.2.5"
 description = "Publication-ready figures for Matplotlib, Seaborn, Plotly, and Altair"
 readme = "README.md"
 license = {text = "MIT"}
@@ -40,9 +40,8 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "anthropic>=0.79.0",
+
     "Pillow>=9.0.0",
-    "pydantic-ai-slim>=1.60.0",
     "PyYAML>=6.0",
 ]
 
