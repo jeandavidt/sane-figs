@@ -253,52 +253,53 @@ PASTEL_COLORWAY = Colorway(
 )
 
 # Colorblind-Safe Colorway
-# Specifically designed for colorblind accessibility using CUD principles
+# Designed for accessibility across all types of color vision deficiency
+# Based on Wong (2011) with improved luminance contrast and strategic ordering
 COLORBLIND_SAFE_COLORWAY = Colorway(
     name="colorblind-safe",
-    description="Designed for colorblind accessibility using CUD principles",
+    description="Optimized for deuteranopia, protanopia, and tritanopia with distinct luminance values",
     categorical=[
-        "#E69F00",  # Orange
-        "#56B4E9",  # Sky blue
-        "#009E73",  # Bluish green
-        "#F0E442",  # Yellow
-        "#0072B2",  # Blue
-        "#D55E00",  # Vermilion
-        "#CC79A7",  # Reddish purple
-        "#000000",  # Black
+        "#000000",  # Black (L* 0) - always distinguishable
+        "#0072B2",  # Deep Blue (L* 43) - dark, cool
+        "#D55E00",  # Vermilion (L* 47) - dark, warm
+        "#009E73",  # Teal Green (L* 58) - medium
+        "#E69F00",  # Orange (L* 67) - medium-light, warm
+        "#56B4E9",  # Sky Blue (L* 71) - medium-light, cool
+        "#F0E442",  # Yellow (L* 90) - light, distinct
+        "#CC79A7",  # Muted Pink (L* 62) - alternate medium
     ],
     sequential=[
-        "#F7FCF5",  # Lightest green
-        "#E5F5E0",
-        "#C7E9C0",
-        "#A1D99B",
-        "#74C476",
-        "#41AB5D",
-        "#238B45",
-        "#006D2C",
-        "#00441B",  # Darkest green
+        "#FFF5E6",  # Lightest cream
+        "#FFE4C4",
+        "#FFD4A3",
+        "#FFC382",
+        "#FFB361",
+        "#E69F00",  # Orange anchor
+        "#CC8A00",
+        "#B37500",
+        "#8A5A00",  # Darkest brown-orange
     ],
     diverging=[
-        "#B2182B",  # Dark red
-        "#D6604D",
-        "#F4A582",
-        "#FDDBC7",
-        "#F7F7F7",  # Neutral center
-        "#D1E5F0",
-        "#92C5DE",
-        "#4393C3",
-        "#2166AC",
-        "#053061",  # Dark blue
+        "#8B4513",  # Saddle Brown (L* 35) - dark, distinct from blue
+        "#CD853F",
+        "#DEB887",
+        "#F5DEB3",
+        "#FFFAF0",  # Floral White center
+        "#E6F3FF",
+        "#B3D9FF",
+        "#80C5FF",
+        "#4DB2FF",
+        "#0072B2",  # Deep Blue (L* 43)
     ],
     qualitative=[
-        "#E69F00",  # Orange
-        "#56B4E9",  # Sky blue
-        "#009E73",  # Bluish green
-        "#F0E442",  # Yellow
-        "#0072B2",  # Blue
-        "#D55E00",  # Vermilion
-        "#CC79A7",  # Reddish purple
         "#000000",  # Black
+        "#0072B2",  # Deep Blue
+        "#D55E00",  # Vermilion
+        "#009E73",  # Teal Green
+        "#E69F00",  # Orange
+        "#56B4E9",  # Sky Blue
+        "#F0E442",  # Yellow
+        "#CC79A7",  # Muted Pink
     ],
 )
 
@@ -431,6 +432,54 @@ MARIMO_COLORWAY = Colorway(
     ],
 )
 
+# Biomath Colorway
+# UGent Bioscience Engineering template colors
+# Uses UGent Panno Text font family colors and Bioengineering faculty branding
+BIOMATH_COLORWAY = Colorway(
+    name="biomath",
+    description="UGent Bioscience Engineering template with official brand colors",
+    categorical=[
+        "#1E64C8",  # UGent Blue (primary)
+        "#27ABAD",  # Bioengineering Teal (faculty accent)
+        "#FFD200",  # UGent Yellow (accent)
+        "#C80000",  # Alert Red (warnings)
+        "#0A4D8C",  # Dark Blue (contrast)
+        "#1A7A7C",  # Dark Teal (depth)
+        "#B89400",  # Dark Yellow (muted accent)
+        "#333333",  # Dark Gray (text)
+    ],
+    sequential=[
+        "#E8F0FC",  # Lightest blue
+        "#C5D9F7",
+        "#9BBEF0",
+        "#6FA0E8",
+        "#4A85E0",
+        "#1E64C8",  # UGent Blue anchor
+        "#184FA0",
+        "#123B78",
+        "#0A2850",  # Darkest navy
+    ],
+    diverging=[
+        "#C80000",  # Alert Red
+        "#E04D4D",
+        "#F08080",
+        "#F8B4B4",
+        "#F2F2EB",  # Neutral beige (code background)
+        "#B4E0E1",
+        "#7ACACC",
+        "#4DBFC1",
+        "#27ABAD",  # Bioengineering Teal
+    ],
+    qualitative=[
+        "#1E64C8",  # UGent Blue
+        "#27ABAD",  # Bioengineering Teal
+        "#FFD200",  # UGent Yellow
+        "#C80000",  # Alert Red
+        "#0A4D8C",  # Dark Blue
+        "#1A7A7C",  # Dark Teal
+    ],
+)
+
 # Registry of all colorways
 _COLORWAY_REGISTRY: dict[str, Colorway] = {
     "default": DEFAULT_COLORWAY,
@@ -441,6 +490,7 @@ _COLORWAY_REGISTRY: dict[str, Colorway] = {
     "ulaval": ULAVAL_COLORWAY,
     "modeleau": MODELEAU_COLORWAY,
     "marimo": MARIMO_COLORWAY,
+    "biomath": BIOMATH_COLORWAY,
 }
 
 
@@ -505,7 +555,7 @@ def unregister_colorway(name: str) -> None:
         raise ValueError(f"Colorway '{name}' not found.")
 
     # Prevent unregistering built-in colorways
-    built_in = ["default", "nature", "vibrant", "pastel", "colorblind-safe", "ulaval", "modeleau", "marimo"]
+    built_in = ["default", "nature", "vibrant", "pastel", "colorblind-safe", "ulaval", "modeleau", "marimo", "biomath"]
     if name in built_in:
         raise ValueError(f"Cannot unregister built-in colorway '{name}'.")
 

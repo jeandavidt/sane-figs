@@ -19,13 +19,39 @@ sane_figs.setup(mode='presentation')
 
 ## Creating Custom Presets
 
-Create a YAML file to define your custom preset:
+Create a YAML file to define your custom preset. You can either specify all fields explicitly, or use the `base` field to inherit from an existing preset and only override specific values.
+
+### Using Inheritance (Recommended)
+
+The `base` field allows you to inherit all settings from an existing preset (like `article` or `presentation`) and only override the fields you want to change:
+
+```yaml
+name: "my-journal-preset"
+base: "article"  # Inherit all settings from article preset
+
+# Only override specific fields
+figure:
+  size: [7.0, 5.0]  # Larger figure size
+
+typography:
+  font_family: "serif"  # Use serif font
+  font_sizes:
+    title: 16.0  # Larger title
+
+# All other settings (dpi, line_width, etc.) are inherited from "article"
+```
+
+Available base presets include: `article`, `presentation`, `ulaval`, `modeleau`, `marimo`, `latex`, or any previously registered custom preset.
+
+### Full Custom Preset (Without Inheritance)
+
+If you don't specify a `base`, you must provide all required fields:
 
 ```yaml
 name: "my-custom-preset"
-mode: "custom"
+# No 'base' specified - must define all required fields
 
-# Figure settings
+# Figure settings (required)
 figure:
   size: [8.0, 6.0]  # [width, height] in inches
   dpi: 300
@@ -55,6 +81,19 @@ watermark:
   text: "© 2025 My Lab"
   position: "bottom-right"
   opacity: 0.3
+```
+
+### Font Size Merging
+
+When using inheritance, `font_sizes` are merged with the base preset. You only need to specify the sizes you want to override:
+
+```yaml
+name: "large-title-preset"
+base: "article"
+
+typography:
+  font_sizes:
+    title: 20.0  # Only override title, keep other sizes from article
 ```
 
 ## Using Custom Presets
@@ -117,12 +156,10 @@ You can define multiple presets in a single YAML file:
 ```yaml
 presets:
   - name: "small-print"
-    mode: "custom"
+    base: "article"
     figure:
       size: [4.0, 3.0]
-      dpi: 300
     typography:
-      font_family: "sans-serif"
       font_sizes:
         title: 12.0
         label: 10.0
@@ -130,45 +167,39 @@ presets:
         tick: 8.0
 
   - name: "large-poster"
-    mode: "custom"
+    base: "presentation"
     figure:
       size: [16.0, 12.0]
-      dpi: 150
     typography:
-      font_family: "sans-serif"
       font_sizes:
-        title: 24.0
-        label: 20.0
-        legend: 16.0
-        tick: 16.0
+        title: 36.0
+        label: 28.0
+        legend: 24.0
+        tick: 24.0
 ```
+
+Each preset can use a different `base` to inherit from, making it easy to create variations optimized for different use cases.
 
 ## Example: Custom Preset for Journal Submission
 
 ```yaml
 name: "nature-journal"
-mode: "custom"
+base: "article"  # Start with article preset
 
 figure:
-  size: [7.0, 5.0]
-  dpi: 300
+  size: [7.0, 5.0]  # Nature's recommended single column size
 
 typography:
   font_family: "Arial"
   font_sizes:
     title: 14.0
     label: 12.0
-    legend: 10.0
-    tick: 10.0
-    annotation: 10.0
-
-elements:
-  line_width: 1.5
-  marker_size: 6.0
 
 colorway:
   name: "colorblind-safe"
 ```
+
+This preset inherits the DPI, line width, and other settings from the `article` preset while customizing the figure size, font family, and font sizes for Nature's requirements.
 
 ```python
 import sane_figs

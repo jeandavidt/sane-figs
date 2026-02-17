@@ -1,65 +1,66 @@
-# Example file with multiple presets for sane-figs
+# Example file with multiple presets for sane-figs (new format)
+# Demonstrates preset definitions using mode and style sections
 
 presets:
   # Preset optimized for Nature journal
   - name: "nature-journal"
-    mode: "custom"
-    figure:
-      size: [8.9, 6.9]  # Nature's recommended single column size
-      dpi: 300
-      screen_dpi: 100
-    typography:
-      font_family: "sans-serif"
+    mode:
+      name: "nature-mode"
+      base: "article"
+      figure_size: [8.9, 6.9]  # Nature's recommended single column size
       font_sizes:
         title: 14.0
         label: 12.0
-        legend: 10.0
-        tick: 10.0
-        annotation: 10.0
-    elements:
-      line_width: 1.5
-      marker_size: 6.0
-    colorway:
-      name: "nature"
+    style:
+      name: "nature-style"
+      base: "default"
+      colorway:
+        name: "nature"
 
   # Preset optimized for Science journal
   - name: "science-journal"
-    mode: "custom"
-    figure:
-      size: [5.5, 5.5]  # Science's recommended size
-      dpi: 300
-      screen_dpi: 100
-    typography:
-      font_family: "sans-serif"
+    mode:
+      name: "science-mode"
+      base: "article"
+      figure_size: [5.5, 5.5]  # Science's recommended size
       font_sizes:
         title: 14.0
         label: 12.0
-        legend: 10.0
-        tick: 10.0
-        annotation: 10.0
-    elements:
-      line_width: 1.5
-      marker_size: 6.0
-    colorway:
-      name: "default"
+    style:
+      name: "science-style"
+      base: "default"
+      colorway:
+        name: "default"
 
   # Preset optimized for PLOS ONE
   - name: "plos-one"
-    mode: "custom"
-    figure:
-      size: [7.0, 5.0]
-      dpi: 300
-      screen_dpi: 100
-    typography:
-      font_family: "sans-serif"
+    mode:
+      name: "plos-mode"
+      base: "article"
+      figure_size: [7.0, 5.0]
       font_sizes:
         title: 16.0
         label: 14.0
         legend: 12.0
         tick: 12.0
-        annotation: 12.0
-    elements:
       line_width: 2.0
       marker_size: 8.0
-    colorway:
-      name: "colorblind-safe"
+    style:
+      name: "plos-style"
+      base: "default"
+      colorway:
+        name: "colorblind-safe"
+
+  # Preset optimized for presentations with article sizing
+  - name: "article-vibrant"
+    mode:
+      name: "article-vibrant-mode"
+      base: "article"
+    style:
+      name: "article-vibrant-style"
+      base: "default"
+      colorway:
+        name: "vibrant"
+      plot_style:
+        grid_visible: true
+        grid_opacity: 0.2

@@ -499,7 +499,9 @@ class SeabornAdapter(BaseAdapter):
 
         import matplotlib as mpl
 
-        mpl.rcParams["axes.titlealignment"] = ha
+        # axes.titlealignment is only available in matplotlib 3.3+
+        if "axes.titlealignment" in mpl.rcParams:
+            mpl.rcParams["axes.titlealignment"] = ha
 
     def apply_legend_config(self, config: "LegendConfig") -> None:
         """

@@ -1,4 +1,4 @@
-"""YAML parser for sane-figs presets and colorways."""
+"""YAML parser for sane-figs modes, styles, and presets."""
 
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,7 +13,9 @@ from sane_figs.core.validation import (
 )
 
 if TYPE_CHECKING:
+    from sane_figs.core.modes import Mode
     from sane_figs.core.presets import Preset
+    from sane_figs.core.styles import Style
     from sane_figs.styling.colorways import Colorway
     from sane_figs.styling.watermarks import WatermarkConfig
 
@@ -36,6 +38,8 @@ class YAMLValidationError(Exception):
 def load_preset_from_yaml(file_path: str | Path) -> "Preset":
     """
     Load a single preset from a YAML file.
+
+    Supports both legacy format and new mode/style format.
 
     Args:
         file_path: Path to the YAML file.
@@ -64,7 +68,11 @@ def load_preset_from_yaml(file_path: str | Path) -> "Preset":
             raise YAMLParseError(f"No presets found in file: {file_path}")
         return presets[0]
 
-    # Single preset file
+    # Check if this is the new format with mode/style sections
+    if "mode" in data or "style" in data:
+        return _parse_preset_from_new_format(data, path.parent)
+
+    # Legacy single preset file
     preset = _parse_preset_from_dict(data, path.parent)
     return preset
 
@@ -72,6 +80,8 @@ def load_preset_from_yaml(file_path: str | Path) -> "Preset":
 def load_presets_from_yaml(file_path: str | Path) -> list["Preset"]:
     """
     Load multiple presets from a YAML file.
+
+    Supports both legacy format and new mode/style format.
 
     Args:
         file_path: Path to the YAML file.
@@ -98,7 +108,74 @@ def load_presets_from_yaml(file_path: str | Path) -> list["Preset"]:
         return _parse_presets_from_dict(data, path.parent)
 
     # Single preset file - return as a list
+    # Check if this is the new format with mode/style sections
+    if "mode" in data or "style" in data:
+        return [_parse_preset_from_new_format(data, path.parent)]
+
+    # Legacy format
     return [_parse_preset_from_dict(data, path.parent)]
+
+
+def load_mode_from_yaml(file_path: str | Path) -> "Mode":
+    """
+    Load a mode from a YAML file.
+
+    Args:
+        file_path: Path to the YAML file.
+
+    Returns:
+        The Mode object.
+
+    Raises:
+        YAMLParseError: If the YAML file cannot be parsed.
+    """
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"YAML file not found: {file_path}")
+
+    with open(path, "r") as f:
+        data = yaml.safe_load(f)
+
+    if data is None:
+        raise YAMLParseError(f"YAML file is empty: {file_path}")
+
+    # Check if this has a mode section
+    if "mode" in data:
+        return _parse_mode_from_dict(data["mode"])
+
+    # Direct mode definition
+    return _parse_mode_from_dict(data)
+
+
+def load_style_from_yaml(file_path: str | Path) -> "Style":
+    """
+    Load a style from a YAML file.
+
+    Args:
+        file_path: Path to the YAML file.
+
+    Returns:
+        The Style object.
+
+    Raises:
+        YAMLParseError: If the YAML file cannot be parsed.
+    """
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"YAML file not found: {file_path}")
+
+    with open(path, "r") as f:
+        data = yaml.safe_load(f)
+
+    if data is None:
+        raise YAMLParseError(f"YAML file is empty: {file_path}")
+
+    # Check if this has a style section
+    if "style" in data:
+        return _parse_style_from_dict(data["style"], path.parent)
+
+    # Direct style definition
+    return _parse_style_from_dict(data, path.parent)
 
 
 def load_colorway_from_yaml(file_path: str | Path) -> "Colorway":
@@ -169,9 +246,327 @@ def load_colorways_from_yaml(file_path: str | Path) -> list["Colorway"]:
     return [_parse_colorway_from_dict(data)]
 
 
+def _parse_mode_from_dict(data: dict) -> "Mode":
+    """
+    Parse a mode from a dictionary.
+
+    Supports inheritance via the 'base' field.
+
+    Args:
+        data: The dictionary containing mode data.
+
+    Returns:
+        The Mode object.
+
+    Raises:
+        YAMLParseError: If required fields are missing.
+    """
+    from sane_figs.core.modes import Mode, get_mode
+
+    # Required field: name
+    if "name" not in data:
+        raise YAMLParseError("Missing required field: 'name' for mode")
+
+    # Check for inheritance
+    base_mode = None
+    if "base" in data:
+        base_name = data["base"]
+        try:
+            base_mode = get_mode(base_name)
+        except ValueError as e:
+            raise YAMLParseError(f"Invalid 'base' mode: {e}")
+
+    # Start with base mode values if inheritance is used, otherwise use defaults
+    if base_mode is not None:
+        figure_size = base_mode.figure_size
+        dpi = base_mode.dpi
+        screen_dpi = base_mode.screen_dpi
+        font_sizes = dict(base_mode.font_sizes)
+        line_width = base_mode.line_width
+        marker_size = base_mode.marker_size
+    else:
+        figure_size = None
+        dpi = 300
+        screen_dpi = None
+        font_sizes = {}
+        line_width = 1.5
+        marker_size = 6.0
+
+    # Override with values from YAML
+    if "figure_size" in data:
+        figure_size = tuple(data["figure_size"])
+        if len(figure_size) != 2:
+            raise YAMLParseError("'figure_size' must be a list of two numbers")
+
+    if "dpi" in data:
+        dpi = data["dpi"]
+
+    if "screen_dpi" in data:
+        screen_dpi = data["screen_dpi"]
+
+    if "font_sizes" in data:
+        font_sizes.update(data["font_sizes"])
+
+    if "line_width" in data:
+        line_width = data["line_width"]
+
+    if "marker_size" in data:
+        marker_size = data["marker_size"]
+
+    # Require figure_size if not inheriting from a base mode
+    if figure_size is None:
+        raise YAMLParseError("Missing required field: 'figure_size' (or specify 'base' to inherit)")
+
+    return Mode(
+        name=data["name"],
+        figure_size=figure_size,
+        dpi=dpi,
+        screen_dpi=screen_dpi,
+        font_sizes=font_sizes,
+        line_width=line_width,
+        marker_size=marker_size,
+    )
+
+
+def _parse_style_from_dict(data: dict, base_path: Path) -> "Style":
+    """
+    Parse a style from a dictionary.
+
+    Supports inheritance via the 'base' field.
+
+    Args:
+        data: The dictionary containing style data.
+        base_path: Base path for resolving relative paths.
+
+    Returns:
+        The Style object.
+
+    Raises:
+        YAMLParseError: If required fields are missing.
+    """
+    from sane_figs.core.styles import Style, get_style
+    from sane_figs.styling.colorways import get_colorway
+    from sane_figs.styling.layout import PlotStyle, TitleConfig, LegendConfig, AxisTitleSpacingConfig
+
+    # Required field: name
+    if "name" not in data:
+        raise YAMLParseError("Missing required field: 'name' for style")
+
+    # Check for inheritance
+    base_style = None
+    if "base" in data:
+        base_name = data["base"]
+        try:
+            base_style = get_style(base_name)
+        except ValueError as e:
+            raise YAMLParseError(f"Invalid 'base' style: {e}")
+
+    # Start with base style values if inheritance is used, otherwise use defaults
+    if base_style is not None:
+        font_family = base_style.font_family
+        colorway = base_style.colorway
+        plot_style = PlotStyle(
+            background_color=base_style.plot_style.background_color,
+            grid_visible=base_style.plot_style.grid_visible,
+            grid_color=base_style.plot_style.grid_color,
+            grid_opacity=base_style.plot_style.grid_opacity,
+            grid_width=base_style.plot_style.grid_width,
+            axis_line_color=base_style.plot_style.axis_line_color,
+            axis_line_width=base_style.plot_style.axis_line_width,
+            show_top_spine=base_style.plot_style.show_top_spine,
+            show_right_spine=base_style.plot_style.show_right_spine,
+            tick_direction=base_style.plot_style.tick_direction,
+            tick_length=base_style.plot_style.tick_length,
+            tick_color=base_style.plot_style.tick_color,
+            title_weight=base_style.plot_style.title_weight,
+            legend_frame_opacity=base_style.plot_style.legend_frame_opacity,
+            legend_edge_color=base_style.plot_style.legend_edge_color,
+        )
+        title_config = base_style.title_config
+        legend_config = base_style.legend_config
+        axis_title_spacing = base_style.axis_title_spacing
+        watermark = base_style.watermark
+    else:
+        font_family = "sans-serif"
+        colorway = None
+        plot_style = PlotStyle()
+        title_config = None
+        legend_config = None
+        axis_title_spacing = None
+        watermark = None
+
+    # Override with values from YAML
+    if "font_family" in data:
+        font_family = data["font_family"]
+
+    # Parse colorway
+    if "colorway" in data:
+        colorway_data = data["colorway"]
+        if isinstance(colorway_data, str):
+            colorway = get_colorway(colorway_data)
+        elif isinstance(colorway_data, dict):
+            if "name" in colorway_data and "description" not in colorway_data:
+                # Reference to built-in colorway
+                colorway = get_colorway(colorway_data["name"])
+            else:
+                # Inline colorway definition
+                colorway = _parse_colorway_from_dict(colorway_data)
+
+    # Parse plot_style overrides
+    if "plot_style" in data:
+        ps_data = data["plot_style"]
+        if isinstance(ps_data, dict):
+            for key in (
+                "background_color", "grid_visible", "grid_color", "grid_opacity",
+                "grid_width", "axis_line_color", "axis_line_width",
+                "show_top_spine", "show_right_spine", "tick_direction",
+                "tick_length", "tick_color", "title_weight",
+                "legend_frame_opacity", "legend_edge_color",
+            ):
+                if key in ps_data:
+                    setattr(plot_style, key, ps_data[key])
+
+    # Parse title configuration
+    if "title" in data:
+        title_data = data["title"]
+        alignment = title_data.get("alignment", "center")
+        title_config = TitleConfig(alignment=alignment)
+
+    # Parse legend configuration
+    if "legend" in data:
+        legend_data = data["legend"]
+        position = legend_data.get("position", "inside_upper_right")
+        alignment = legend_data.get("alignment", "center")
+        x_offset = legend_data.get("x_offset", 0.0)
+        y_offset = legend_data.get("y_offset", 0.0)
+        legend_config = LegendConfig(
+            position=position,
+            alignment=alignment,
+            x_offset=x_offset,
+            y_offset=y_offset,
+        )
+
+    # Parse axis title spacing configuration
+    if "axis_title_spacing" in data:
+        spacing_data = data["axis_title_spacing"]
+        x_spacing = spacing_data.get("x_spacing", 8.0)
+        y_spacing = spacing_data.get("y_spacing", 8.0)
+        plotly_multiplier = spacing_data.get("plotly_multiplier", 1.5)
+        altair_multiplier = spacing_data.get("altair_multiplier", 1.2)
+        matplotlib_multiplier = spacing_data.get("matplotlib_multiplier", 1.0)
+        axis_title_spacing = AxisTitleSpacingConfig(
+            x_spacing=x_spacing,
+            y_spacing=y_spacing,
+            plotly_multiplier=plotly_multiplier,
+            altair_multiplier=altair_multiplier,
+            matplotlib_multiplier=matplotlib_multiplier,
+        )
+
+    # Parse watermark
+    if "watermark" in data:
+        watermark_data = data["watermark"]
+        watermark = _parse_watermark_from_dict(watermark_data, base_path)
+
+    return Style(
+        name=data["name"],
+        font_family=font_family,
+        colorway=colorway,
+        plot_style=plot_style,
+        title_config=title_config,
+        legend_config=legend_config,
+        axis_title_spacing=axis_title_spacing,
+        watermark=watermark,
+    )
+
+
+def _parse_preset_from_new_format(data: dict, base_path: Path) -> "Preset":
+    """
+    Parse a preset from the new format with mode and style sections.
+
+    Args:
+        data: The dictionary containing preset data with 'mode' and/or 'style' keys.
+        base_path: Base path for resolving relative paths.
+
+    Returns:
+        The Preset object.
+
+    Raises:
+        YAMLParseError: If the data is invalid.
+        YAMLValidationError: If the preset is invalid.
+    """
+    from sane_figs.core.modes import Mode, get_mode
+    from sane_figs.core.presets import Preset
+    from sane_figs.core.styles import Style, get_style
+    from sane_figs.styling.colorways import get_colorway
+    from sane_figs.styling.layout import PlotStyle, TitleConfig, LegendConfig, AxisTitleSpacingConfig
+
+    # Parse mode section
+    mode_obj = None
+    if "mode" in data:
+        mode_data = data["mode"]
+        if isinstance(mode_data, str):
+            # Simple reference to a named mode
+            mode_obj = get_mode(mode_data)
+        elif isinstance(mode_data, dict):
+            mode_obj = _parse_mode_from_dict(mode_data)
+        else:
+            raise YAMLParseError("'mode' must be a string or a dictionary")
+    else:
+        # Default to article mode
+        mode_obj = get_mode("article")
+
+    # Parse style section
+    style_obj = None
+    if "style" in data:
+        style_data = data["style"]
+        if isinstance(style_data, str):
+            # Simple reference to a named style
+            style_obj = get_style(style_data)
+        elif isinstance(style_data, dict):
+            style_obj = _parse_style_from_dict(style_data, base_path)
+        else:
+            raise YAMLParseError("'style' must be a string or a dictionary")
+    else:
+        # Default to default style
+        style_obj = get_style("default")
+
+    # Determine preset name
+    preset_name = data.get("name")
+    if preset_name is None:
+        if isinstance(data.get("mode"), dict) and "name" in data["mode"]:
+            mode_name = data["mode"]["name"]
+        else:
+            mode_name = mode_obj.name if mode_obj else "article"
+
+        if isinstance(data.get("style"), dict) and "name" in data["style"]:
+            style_name = data["style"]["name"]
+        else:
+            style_name = style_obj.name if style_obj else "default"
+
+        preset_name = f"{mode_name}-{style_name}"
+
+    # Build preset from mode and style
+    preset = Preset.from_mode_and_style(
+        name=preset_name,
+        mode=mode_obj,
+        style=style_obj,
+    )
+
+    # Validate preset
+    errors = validate_preset(preset)
+    if errors:
+        raise YAMLValidationError(errors)
+
+    return preset
+
+
 def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
     """
-    Parse a preset from a dictionary.
+    Parse a preset from a dictionary (legacy format).
+
+    Supports inheritance via the 'base' field. When 'base' is specified,
+    the preset will inherit all fields from the referenced preset and
+    only override the fields defined in the YAML.
 
     Args:
         data: The dictionary containing preset data.
@@ -184,39 +579,114 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
         YAMLParseError: If required fields are missing.
         YAMLValidationError: If the data is invalid.
     """
-    from sane_figs.core.presets import Preset
+    from sane_figs.core.presets import Preset, get_preset
     from sane_figs.styling.colorways import get_colorway
     from sane_figs.styling.watermarks import WatermarkConfig
     from sane_figs.styling.layout import PlotStyle, TitleConfig, LegendConfig, AxisTitleSpacingConfig
 
-    # Required fields
+    # Required field: name
     if "name" not in data:
         raise YAMLParseError("Missing required field: 'name'")
-    if "mode" not in data:
-        raise YAMLParseError("Missing required field: 'mode'")
+
+    # Check for inheritance
+    base_preset = None
+    if "base" in data:
+        base_name = data["base"]
+        try:
+            base_preset = get_preset(base_name)
+        except ValueError as e:
+            raise YAMLParseError(f"Invalid 'base' preset: {e}")
+
+    # Start with base preset values if inheritance is used, otherwise use defaults
+    if base_preset is not None:
+        # Inherit from base preset
+        figure_size = base_preset.figure_size
+        dpi = base_preset.dpi
+        screen_dpi = base_preset.screen_dpi
+        font_family = base_preset.font_family
+        font_sizes = dict(base_preset.font_size) if base_preset.font_size else {}
+        line_width = base_preset.line_width
+        marker_size = base_preset.marker_size
+        plot_style = PlotStyle(
+            background_color=base_preset.plot_style.background_color,
+            grid_visible=base_preset.plot_style.grid_visible,
+            grid_color=base_preset.plot_style.grid_color,
+            grid_opacity=base_preset.plot_style.grid_opacity,
+            grid_width=base_preset.plot_style.grid_width,
+            axis_line_color=base_preset.plot_style.axis_line_color,
+            axis_line_width=base_preset.plot_style.axis_line_width,
+            show_top_spine=base_preset.plot_style.show_top_spine,
+            show_right_spine=base_preset.plot_style.show_right_spine,
+            tick_direction=base_preset.plot_style.tick_direction,
+            tick_length=base_preset.plot_style.tick_length,
+            tick_color=base_preset.plot_style.tick_color,
+            title_weight=base_preset.plot_style.title_weight,
+            legend_frame_opacity=base_preset.plot_style.legend_frame_opacity,
+            legend_edge_color=base_preset.plot_style.legend_edge_color,
+        )
+        colorway = base_preset.colorway
+        watermark = base_preset.watermark
+        title_config = base_preset.title_config
+        legend_config = base_preset.legend_config
+        axis_title_spacing = base_preset.axis_title_spacing
+        mode = base_preset.mode
+    else:
+        # Default values when not inheriting
+        figure_size = None
+        dpi = 300
+        screen_dpi = None
+        font_family = "sans-serif"
+        font_sizes = {}
+        line_width = 1.5
+        marker_size = 6.0
+        plot_style = PlotStyle()
+        colorway = None
+        watermark = None
+        title_config = None
+        legend_config = None
+        axis_title_spacing = None
+        mode = "custom"
+
+    # Override with values from YAML (if present)
 
     # Parse figure settings
-    figure_data = data.get("figure", {})
-    if "size" not in figure_data:
-        raise YAMLParseError("Missing required field: 'figure.size'")
-    figure_size = tuple(figure_data["size"])
-    if len(figure_size) != 2:
-        raise YAMLParseError("'figure.size' must be a list of two numbers")
-    dpi = figure_data.get("dpi", 300)
-    screen_dpi = figure_data.get("screen_dpi", None)
+    if "figure" in data:
+        figure_data = data["figure"]
+        if "size" in figure_data:
+            figure_size = tuple(figure_data["size"])
+            if len(figure_size) != 2:
+                raise YAMLParseError("'figure.size' must be a list of two numbers")
+        if "dpi" in figure_data:
+            dpi = figure_data["dpi"]
+        if "screen_dpi" in figure_data:
+            screen_dpi = figure_data["screen_dpi"]
+
+    # Require figure.size if not inheriting from a base preset
+    if figure_size is None:
+        raise YAMLParseError("Missing required field: 'figure.size' (or specify 'base' to inherit)")
 
     # Parse typography settings
-    typography_data = data.get("typography", {})
-    font_family = typography_data.get("font_family", "sans-serif")
-    font_sizes = typography_data.get("font_sizes", {})
+    if "typography" in data:
+        typography_data = data["typography"]
+        if "font_family" in typography_data:
+            font_family = typography_data["font_family"]
+        if "font_sizes" in typography_data:
+            # Merge font sizes: YAML values override base preset values
+            font_sizes.update(typography_data["font_sizes"])
 
     # Parse element settings
-    elements_data = data.get("elements", {})
-    line_width = elements_data.get("line_width", 1.5)
-    marker_size = elements_data.get("marker_size", 6.0)
+    if "elements" in data:
+        elements_data = data["elements"]
+        if "line_width" in elements_data:
+            line_width = elements_data["line_width"]
+        if "marker_size" in elements_data:
+            marker_size = elements_data["marker_size"]
+
+    # Parse mode (if explicitly specified in YAML, override inherited value)
+    if "mode" in data:
+        mode = data["mode"]
 
     # Parse colorway
-    colorway = None
     if "colorway" in data:
         colorway_data = data["colorway"]
         if isinstance(colorway_data, str):
@@ -235,8 +705,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
                 # Inline colorway definition
                 colorway = _parse_colorway_from_dict(colorway_data)
 
-    # Parse plot_style (all fields optional, defaults from PlotStyle())
-    plot_style = PlotStyle()
+    # Parse plot_style (override specific fields)
     if "plot_style" in data:
         ps_data = data["plot_style"]
         if isinstance(ps_data, dict):
@@ -250,23 +719,38 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
             ):
                 if key in ps_data:
                     ps_kwargs[key] = ps_data[key]
-            plot_style = PlotStyle(**ps_kwargs)
+            if ps_kwargs:
+                # Create new PlotStyle with overridden values
+                plot_style = PlotStyle(
+                    background_color=ps_kwargs.get("background_color", plot_style.background_color),
+                    grid_visible=ps_kwargs.get("grid_visible", plot_style.grid_visible),
+                    grid_color=ps_kwargs.get("grid_color", plot_style.grid_color),
+                    grid_opacity=ps_kwargs.get("grid_opacity", plot_style.grid_opacity),
+                    grid_width=ps_kwargs.get("grid_width", plot_style.grid_width),
+                    axis_line_color=ps_kwargs.get("axis_line_color", plot_style.axis_line_color),
+                    axis_line_width=ps_kwargs.get("axis_line_width", plot_style.axis_line_width),
+                    show_top_spine=ps_kwargs.get("show_top_spine", plot_style.show_top_spine),
+                    show_right_spine=ps_kwargs.get("show_right_spine", plot_style.show_right_spine),
+                    tick_direction=ps_kwargs.get("tick_direction", plot_style.tick_direction),
+                    tick_length=ps_kwargs.get("tick_length", plot_style.tick_length),
+                    tick_color=ps_kwargs.get("tick_color", plot_style.tick_color),
+                    title_weight=ps_kwargs.get("title_weight", plot_style.title_weight),
+                    legend_frame_opacity=ps_kwargs.get("legend_frame_opacity", plot_style.legend_frame_opacity),
+                    legend_edge_color=ps_kwargs.get("legend_edge_color", plot_style.legend_edge_color),
+                )
 
     # Parse watermark
-    watermark = None
     if "watermark" in data:
         watermark_data = data["watermark"]
         watermark = _parse_watermark_from_dict(watermark_data, base_path)
 
     # Parse title configuration
-    title_config = None
     if "title" in data:
         title_data = data["title"]
         alignment = title_data.get("alignment", "center")
         title_config = TitleConfig(alignment=alignment)
 
     # Parse legend configuration
-    legend_config = None
     if "legend" in data:
         legend_data = data["legend"]
         position = legend_data.get("position", "inside_upper_right")
@@ -281,7 +765,6 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
         )
 
     # Parse axis title spacing configuration
-    axis_title_spacing = None
     if "axis_title_spacing" in data:
         spacing_data = data["axis_title_spacing"]
         x_spacing = spacing_data.get("x_spacing", 8.0)
@@ -300,7 +783,7 @@ def _parse_preset_from_dict(data: dict, base_path: Path) -> "Preset":
     # Create preset
     preset = Preset(
         name=data["name"],
-        mode=data["mode"],
+        mode=mode,
         figure_size=figure_size,
         dpi=dpi,
         screen_dpi=screen_dpi,
@@ -348,7 +831,11 @@ def _parse_presets_from_dict(data: dict, base_path: Path) -> list["Preset"]:
 
     presets = []
     for preset_data in presets_data:
-        preset = _parse_preset_from_dict(preset_data, base_path)
+        # Check if this preset uses new format
+        if "mode" in preset_data or "style" in preset_data:
+            preset = _parse_preset_from_new_format(preset_data, base_path)
+        else:
+            preset = _parse_preset_from_dict(preset_data, base_path)
         presets.append(preset)
 
     return presets
@@ -505,9 +992,10 @@ def create_sample_preset_yaml(file_path: str | Path) -> Path:
     """
     Create a sample YAML preset template file that users can customize.
 
-    This function generates a well-documented YAML file with all available
-    preset options, including comments explaining each setting. Users can
-    modify this file and load it back using load_preset_from_file().
+    This function generates a well-documented YAML file with the new format
+    supporting mode and style sections, including comments explaining each
+    setting. Users can modify this file and load it back using
+    load_preset_from_file().
 
     Args:
         file_path: Path where the sample YAML file will be saved.
@@ -521,153 +1009,134 @@ def create_sample_preset_yaml(file_path: str | Path) -> Path:
         >>> # User edits my_preset.yaml...
         >>> preset = load_preset_from_file("my_preset.yaml")
     """
-    import yaml
-
     path = Path(file_path)
     if path.suffix != ".yaml" and path.suffix != ".yml":
         path = path.with_suffix(".yaml")
 
-    sample_content = """# Sample preset template for sane-figs
+    sample_content = """# Sample preset template for sane-figs (new format)
 # Edit this file to create a custom preset, then load it with:
 #   from sane_figs import load_preset_from_file
 #   preset = load_preset_from_file("this_file.yaml")
 
-# Required: preset name (must be unique)
+# Optional: Preset name (auto-generated from mode + style names if not specified)
 name: "my-custom-preset"
 
-# Required: preset mode (e.g., "article", "presentation", or "custom")
-mode: "custom"
-
-# Figure settings
-figure:
-  # Figure size as [width, height] in inches
-  size: [6.4, 4.8]
-  # DPI for output files (300 for print, 150 for slides)
-  dpi: 300
-  # DPI for on-screen / HTML rendering (optional, defaults to 100)
+# Mode section: defines figure dimensions and element sizing
+mode:
+  # Optional: Name of this mode (for reference)
+  name: "my-mode"
+  
+  # Optional: Base mode to inherit from
+  # When specified, all fields from the base mode are copied and can be
+  # selectively overridden. Available bases: article, presentation
+  base: "article"
+  
+  # Optional: Override figure size [width, height] in inches
+  # figure_size: [3.5, 2.625]
+  
+  # Optional: DPI for output files (300 for print, 150 for slides)
+  # dpi: 300
+  
+  # Optional: DPI for on-screen / HTML rendering (defaults to 100)
   # screen_dpi: 100
+  
+  # Optional: Font sizes for different elements (in points)
+  # These are merged with base mode font sizes
+  # font_sizes:
+  #   title: 9.0
+  #   label: 8.0
+  #   legend: 7.0
+  #   tick: 7.0
+  #   annotation: 7.0
+  
+  # Optional: Line and marker sizing
+  # line_width: 1.0
+  # marker_size: 4.0
 
-# Typography settings
-typography:
-  # Font family (e.g., "sans-serif", "serif", "DejaVu Sans")
-  font_family: "sans-serif"
-  # Font sizes for different elements (in points)
-  font_sizes:
-    title: 14.0
-    label: 12.0
-    legend: 10.0
-    tick: 10.0
-    annotation: 10.0
-
-# Line and marker settings
-elements:
-  # Line width for plots
-  line_width: 1.5
-  # Marker size for scatter plots
-  marker_size: 6.0
-
-# Visual chrome (optional — all fields default to clean white style)
-# Uncomment and modify individual fields as needed.
-# plot_style:
-#   background_color: "white"
-#   grid_visible: true
-#   grid_color: "black"
-#   grid_opacity: 0.3          # 0.0 = invisible, 1.0 = solid
-#   grid_width: 0.5            # points
-#   axis_line_color: "black"
-#   axis_line_width: 0.8       # points
-#   show_top_spine: false
-#   show_right_spine: false
-#   tick_direction: "outside"  # outside | inside | both
-#   tick_length: 4.0           # points
-#   tick_color: "black"
-#   title_weight: "bold"
-#   legend_frame_opacity: 0.9  # 0.0 = transparent, 1.0 = opaque
-#   legend_edge_color: "inherit"  # "inherit" uses axis_line_color
-
-# Colorway: either a reference to a built-in colorway or inline definition
-# Option 1: Reference to built-in colorway
-colorway:
-  name: "default"  # Options: default, nature, vibrant, pastel, colorblind-safe
-
-# Option 2: Inline colorway definition (uncomment to use)
-# colorway:
-#   name: "my-colors"
-#   description: "My custom color palette"
-#   colors:
-#     categorical:
-#       - "#E63946"
-#       - "#457B9D"
-#       - "#1D3557"
-#     sequential:
-#       - "#F1FAEE"
-#       - "#A8DADC"
-#       - "#457B9D"
-#       - "#1D3557"
-#     diverging:
-#       - "#E63946"
-#       - "#F4A261"
-#       - "#E9C46A"
-#       - "#2A9D8F"
-#       - "#264653"
-#     qualitative:
-#       - "#E63946"
-#       - "#F1FAEE"
-#       - "#A8DADC"
-#       - "#457B9D"
-#       - "#1D3557"
-#       - "#2A9D8F"
-#       - "#E9C46A"
-#       - "#F4A261"
-
-# Title configuration (optional)
-title:
-  # Title alignment: "left", "center", or "right"
-  alignment: "center"
-
-# Legend configuration (optional)
-legend:
-  # Legend position:
-  # Inside: "inside_upper_right", "inside_upper_left", "inside_lower_right",
-  #         "inside_lower_left", "inside_center"
-  # Outside: "outside_right", "outside_left", "outside_top", "outside_bottom"
-  position: "inside_upper_right"
-  # Legend alignment when positioned outside: "start", "center", "end"
-  alignment: "center"
-  # Offset from anchor position (0-1 scale)
-  x_offset: 0.0
-  y_offset: 0.0
-
-# Axis title spacing configuration (optional)
-axis_title_spacing:
-  # Horizontal spacing for x-axis title (in points)
-  x_spacing: 8.0
-  # Vertical spacing for y-axis title (in points)
-  y_spacing: 8.0
-  # Library-specific multipliers to normalize spacing across libraries
-  plotly_multiplier: 1.5  # Plotly tends to have tighter spacing
-  altair_multiplier: 1.2  # Altair spacing adjustment
-  matplotlib_multiplier: 1.0  # Matplotlib is the baseline
-
-# Watermark settings (optional - comment out to disable)
-watermark:
-  # Watermark type: "text" or "image"
-  type: "text"
-  # For text watermarks: the text to display
-  text: "© 2025 My Lab"
-  # For image watermarks: path to image file (relative to this YAML file)
-  # image_path: "logo.png"
-  # Position: "top-left", "top-right", "bottom-left", "bottom-right", "center"
-  position: "bottom-right"
-  # Opacity (0.0 to 1.0)
-  opacity: 0.3
-  # For image watermarks: scale factor relative to figure size
-  scale: 0.1
-  # Font settings (for text watermarks)
-  font_size: 10.0
-  font_family: "sans-serif"
-  font_weight: "normal"
-  font_color: "#000000"
+# Style section: defines visual appearance (colors, fonts, grid settings)
+style:
+  # Optional: Name of this style (for reference)
+  name: "my-style"
+  
+  # Optional: Base style to inherit from
+  # When specified, all fields from the base style are copied and can be
+  # selectively overridden. Available bases: default
+  base: "default"
+  
+  # Optional: Font family (e.g., "sans-serif", "serif", "DejaVu Sans")
+  # font_family: "sans-serif"
+  
+  # Optional: Colorway - can reference a built-in or define inline
+  # Option 1: Reference built-in colorway
+  # colorway:
+  #   name: "default"  # Options: default, nature, vibrant, pastel, colorblind-safe
+  
+  # Option 2: Define inline colorway
+  # colorway:
+  #   name: "my-colors"
+  #   description: "My custom color palette"
+  #   colors:
+  #     categorical:
+  #       - "#E63946"
+  #       - "#457B9D"
+  #     sequential:
+  #       - "#F1FAEE"
+  #       - "#A8DADC"
+  #     diverging:
+  #       - "#E63946"
+  #       - "#2A9D8F"
+  #     qualitative:
+  #       - "#E63946"
+  #       - "#F1FAEE"
+  #       - "#457B9D"
+  
+  # Optional: Plot style settings (grid, spines, etc.)
+  # plot_style:
+  #   background_color: "white"
+  #   grid_visible: true
+  #   grid_color: "black"
+  #   grid_opacity: 0.3
+  #   grid_width: 0.5
+  #   axis_line_color: "black"
+  #   axis_line_width: 0.8
+  #   show_top_spine: false
+  #   show_right_spine: false
+  #   tick_direction: "outside"
+  #   tick_length: 4.0
+  #   tick_color: "black"
+  #   title_weight: "bold"
+  #   legend_frame_opacity: 0.9
+  #   legend_edge_color: "inherit"
+  
+  # Optional: Title configuration
+  # title:
+  #   alignment: "center"  # "left", "center", or "right"
+  
+  # Optional: Legend configuration
+  # legend:
+  #   position: "inside_upper_right"
+  #   alignment: "center"
+  #   x_offset: 0.0
+  #   y_offset: 0.0
+  
+  # Optional: Axis title spacing
+  # axis_title_spacing:
+  #   x_spacing: 8.0
+  #   y_spacing: 8.0
+  #   plotly_multiplier: 1.5
+  #   altair_multiplier: 1.2
+  #   matplotlib_multiplier: 1.0
+  
+  # Optional: Watermark configuration
+  # watermark:
+  #   type: "text"
+  #   text: "© 2025 My Lab"
+  #   position: "bottom-right"
+  #   opacity: 0.3
+  #   font_size: 10.0
+  #   font_family: "sans-serif"
+  #   font_weight: "normal"
+  #   font_color: "#000000"
 """
 
     with open(path, "w") as f:
@@ -696,8 +1165,6 @@ def create_sample_colorway_yaml(file_path: str | Path) -> Path:
         >>> # User edits my_colorway.yaml...
         >>> colorway = load_colorway_from_yaml("my_colorway.yaml")
     """
-    import yaml
-
     path = Path(file_path)
     if path.suffix != ".yaml" and path.suffix != ".yml":
         path = path.with_suffix(".yaml")

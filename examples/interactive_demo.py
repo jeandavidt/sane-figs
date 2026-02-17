@@ -75,31 +75,81 @@ def _(mo, sane_figs):
 
 @app.cell
 def _(mo, sane_figs):
-    # Controls
-    library_selector = mo.ui.dropdown(
-        options=["Matplotlib", "Seaborn", "Plotly", "Altair"], value="Matplotlib", label="Library"
+    # Controls - Mode, Style, Colorway, Font Family, and Library
+
+    # Mode: determines figure dimensions and sizing (article vs presentation)
+    mode_selector = mo.ui.dropdown(
+        options=sane_figs.list_modes(),
+        value="article",
+        label="Mode"
     )
 
+    # Style: determines visual appearance (grid, spines, etc.)
     style_selector = mo.ui.dropdown(
-        options=["article", "presentation"], value="article", label="Style"
+        options=sane_figs.list_styles(),
+        value="default",
+        label="Style"
     )
 
-    # Use list_colorways to populate themes, including ulaval, modeleau etc.
-    theme_selector = mo.ui.dropdown(
-        options=sane_figs.list_colorways(), value="default", label="Theme"
+    # Colorway: determines the color palette (None = use style's colorway)
+    colorway_selector = mo.ui.dropdown(
+        options=["None"] + sane_figs.list_colorways(),
+        value="None",
+        label="Colorway (None = use style default)"
     )
 
-    mo.hstack([library_selector, style_selector, theme_selector], justify="center")
-    return library_selector, style_selector, theme_selector
+    # Font Family: controls the typeface used (None = use style's font)
+    font_selector = mo.ui.dropdown(
+        options=["None", "sans-serif", "serif", "monospace", "Helvetica", "Arial", "Times New Roman", "Georgia"],
+        value="None",
+        label="Font Family (None = use style default)"
+    )
+
+    # Library: which plotting library to use
+    library_selector = mo.ui.dropdown(
+        options=["Matplotlib", "Seaborn", "Plotly", "Altair"],
+        value="Matplotlib",
+        label="Library"
+    )
+
+    # Display all selectors in a grid layout
+    selectors = mo.hstack([
+        mo.vstack([mode_selector, style_selector]),
+        mo.vstack([colorway_selector, font_selector]),
+        mo.vstack([library_selector]),
+    ], justify="center", gap=2)
+
+    selectors
+    return (
+        colorway_selector,
+        font_selector,
+        library_selector,
+        mode_selector,
+        style_selector,
+    )
 
 
 @app.cell
-def _(library_selector, style_selector, theme_selector):
-    # Get values
-    selected_lib = library_selector.value
+def _(
+    colorway_selector,
+    font_selector,
+    library_selector,
+    mode_selector,
+    style_selector,
+):
+    # Get values from selectors
+    selected_mode = mode_selector.value
     selected_style = style_selector.value
-    selected_theme = theme_selector.value
-    return selected_lib, selected_style, selected_theme
+    selected_colorway = colorway_selector.value
+    selected_font = font_selector.value
+    selected_lib = library_selector.value
+    return (
+        selected_colorway,
+        selected_font,
+        selected_lib,
+        selected_mode,
+        selected_style,
+    )
 
 
 @app.cell
@@ -111,9 +161,11 @@ def _(
     plt,
     px,
     sane_figs,
+    selected_colorway,
+    selected_font,
     selected_lib,
+    selected_mode,
     selected_style,
-    selected_theme,
     sns,
 ):
     # Generate Data
@@ -131,14 +183,27 @@ def _(
 
     df = get_data()
 
-    # Reset and Apply Style
-    # We reset first to ensure clean state when switching modes/colorways
+    # Reset and Apply Configuration
     sane_figs.reset()
-    # Apply style (size/font-size) and theme (colors)
-    sane_figs.setup(mode=selected_style, colorway=selected_theme)
+
+    # Build setup kwargs - only pass colorway/font if explicitly selected
+    setup_kwargs = {
+        "mode": selected_mode,
+        "style": selected_style,
+    }
+    if selected_colorway != "None":
+        setup_kwargs["colorway"] = selected_colorway
+    if selected_font != "None":
+        setup_kwargs["font_family"] = selected_font
+
+    # Apply configuration
+    sane_figs.setup(**setup_kwargs)
 
     # Plotting Logic
     final_plot = None
+
+    # Create a descriptive title showing all selected options
+    plot_title = f"{selected_lib} | {selected_style} | {selected_mode}"
 
     try:
         if selected_lib == "Matplotlib":
@@ -146,7 +211,7 @@ def _(
             ax.plot(df["x"], df["y1"], label="Sin(x)")
             ax.plot(df["x"], df["y2"], label="Cos(x)")
             ax.plot(df["x"], df["y3"], label="Combined")
-            ax.set_title(f"{selected_lib} - {selected_style} - {selected_theme}")
+            ax.set_title(plot_title)
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Amplitude")
             ax.legend()
@@ -154,16 +219,14 @@ def _(
 
         elif selected_lib == "Seaborn":
             fig, ax = plt.subplots()
-            # For seaborn, we'll use a slightly different data shape for some var
             sns.lineplot(data=df, x="x", y="y1", label="Sin(x)", ax=ax)
             sns.lineplot(data=df, x="x", y="y2", label="Cos(x)", ax=ax)
-            ax.set_title(f"{selected_lib} - {selected_style} - {selected_theme}")
+            ax.set_title(plot_title)
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Amplitude")
             final_plot = fig
 
         elif selected_lib == "Plotly":
-            # Melt for plotly express
             df_melt = df.melt(
                 id_vars=["x", "category"],
                 value_vars=["y1", "y2", "y3"],
@@ -175,12 +238,11 @@ def _(
                 x="x",
                 y="value",
                 color="signal",
-                title=f"{selected_lib} - {selected_style} - {selected_theme}",
+                title=plot_title,
             )
             final_plot = fig
 
         elif selected_lib == "Altair":
-            # Melt for altair
             df_melt = df.melt(
                 id_vars=["x", "category"],
                 value_vars=["y1", "y2", "y3"],
@@ -191,7 +253,7 @@ def _(
                 alt.Chart(df_melt)
                 .mark_line()
                 .encode(x="x", y="value", color="signal")
-                .properties(title=f"{selected_lib} - {selected_style} - {selected_theme}")
+                .properties(title=plot_title)
             )
             final_plot = fig
 
@@ -202,6 +264,158 @@ def _(
     # Display centered with responsive styling
     centered_plot = mo.center(final_plot)
     centered_plot
+    return
+
+
+@app.cell
+def _(
+    mo,
+    selected_colorway,
+    selected_font,
+    selected_lib,
+    selected_mode,
+    selected_style,
+):
+    # Generate the code to recreate this figure
+
+    # Determine the plotting code based on the selected library
+    _plot_title = f"{selected_lib} | {selected_style} | {selected_mode}"
+
+    if selected_lib == "Matplotlib":
+        plot_code = f'''# Generate data
+    import numpy as np
+    import pandas as pd
+
+    x = np.linspace(0, 10, 100)
+    df = pd.DataFrame({{
+    "x": x,
+    "y1": np.sin(x),
+    "y2": np.cos(x),
+    "y3": np.sin(x) * 0.5 + np.cos(x) * 0.5,
+    }})
+
+    # Create plot
+    fig, ax = plt.subplots()
+    ax.plot(df["x"], df["y1"], label="Sin(x)")
+    ax.plot(df["x"], df["y2"], label="Cos(x)")
+    ax.plot(df["x"], df["y3"], label="Combined")
+    ax.set_title("{_plot_title}")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Amplitude")
+    ax.legend()
+    plt.show()'''
+    elif selected_lib == "Seaborn":
+        plot_code = f'''# Generate data
+    import numpy as np
+    import pandas as pd
+
+    x = np.linspace(0, 10, 100)
+    df = pd.DataFrame({{
+    "x": x,
+    "y1": np.sin(x),
+    "y2": np.cos(x),
+    "y3": np.sin(x) * 0.5 + np.cos(x) * 0.5,
+    }})
+
+    # Create plot
+    import seaborn as sns
+    fig, ax = plt.subplots()
+    sns.lineplot(data=df, x="x", y="y1", label="Sin(x)", ax=ax)
+    sns.lineplot(data=df, x="x", y="y2", label="Cos(x)", ax=ax)
+    ax.set_title("{_plot_title}")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Amplitude")
+    plt.show()'''
+    elif selected_lib == "Plotly":
+        plot_code = f'''# Generate data
+    import numpy as np
+    import pandas as pd
+
+    x = np.linspace(0, 10, 100)
+    df = pd.DataFrame({{
+    "x": x,
+    "y1": np.sin(x),
+    "y2": np.cos(x),
+    "y3": np.sin(x) * 0.5 + np.cos(x) * 0.5,
+    }})
+    df_melt = df.melt(
+    id_vars=["x"],
+    value_vars=["y1", "y2", "y3"],
+    var_name="signal",
+    value_name="value",
+    )
+
+    # Create plot
+    import plotly.express as px
+    fig = px.line(
+    df_melt,
+    x="x",
+    y="value",
+    color="signal",
+    title="{_plot_title}",
+    )
+    fig.show()'''
+    else:  # Altair
+        plot_code = f'''# Generate data
+    import numpy as np
+    import pandas as pd
+
+    x = np.linspace(0, 10, 100)
+    df = pd.DataFrame({{
+    "x": x,
+    "y1": np.sin(x),
+    "y2": np.cos(x),
+    "y3": np.sin(x) * 0.5 + np.cos(x) * 0.5,
+    }})
+    df_melt = df.melt(
+    id_vars=["x"],
+    value_vars=["y1", "y2", "y3"],
+    var_name="signal",
+    value_name="value",
+    )
+
+    # Create plot
+    import altair as alt
+    fig = (
+    alt.Chart(df_melt)
+    .mark_line()
+    .encode(x="x", y="value", color="signal")
+    .properties(title="{_plot_title}")
+    )
+    fig'''
+
+    # Build setup code with conditional colorway/font
+    setup_lines = [
+        f'    mode="{selected_mode}",',
+        f'    style="{selected_style}",',
+    ]
+    if selected_colorway != "None":
+        setup_lines.append(f'    colorway="{selected_colorway}",')
+    if selected_font != "None":
+        setup_lines.append(f'    font_family="{selected_font}",')
+
+    setup_code = "\n".join(setup_lines)
+
+    # Build the full code snippet
+    code_snippet = f'''```python
+    import sane_figs
+    import matplotlib.pyplot as plt
+
+    # Configure sane-figs with your selected options
+    sane_figs.setup(
+    {setup_code}
+    )
+
+    {plot_code}
+    ```'''
+
+    mo.md(f"""
+    ### Generated Code
+
+    Copy and paste this code to recreate the figure with the same configuration:
+
+    {code_snippet}
+    """)
     return
 
 
